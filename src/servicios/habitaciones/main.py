@@ -7,35 +7,47 @@ Responsabilidades:
 """
 
 import sqlite3
+from datetime import date
 from contextlib import contextmanager
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 app = FastAPI(title="Servicio-Habitaciones")
 DB_NAME = "habitaciones.db"
 
 @contextmanager
 def get_db():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(
+        DB_NAME,
+        timeout=10,
+        isolation_level=None
+    )
     conn.row_factory = sqlite3.Row
 
     try:
+        conn.execute("BEGIN IMMEDIATE")
         yield conn
+        conn.execute("COMMIT")
+    except:
+        if conn.in_transaction:
+            conn.execute("ROLLBACK")
+        raise
     finally:
         conn.close()
 
 def init_db():
-    with get_db() as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS reservas (
-                id_reserva TEXT PRIMARY KEY,
-                habitacion_id INTEGER NOT NULL,
-                fecha_inicio TEXT NOT NULL,
-                fecha_fin TEXT NOT NULL,
-                estado TEXT NOT NULL -- 'RESERVADA' o 'LIBERADA'
-            )
-        """)
-        conn.commit()
+    conn = sqlite3.connect(DB_NAME)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS reservas (
+            id_reserva TEXT PRIMARY KEY,
+            habitacion_id INTEGER NOT NULL,
+            fecha_inicio TEXT NOT NULL,
+            fecha_fin TEXT NOT NULL,
+            estado TEXT NOT NULL -- 'RESERVADA' o 'LIBERADA'
+        )
+    """)
+    conn.commit()
+    conn.close()
 
 
 init_db()
@@ -43,12 +55,23 @@ init_db()
 class ReservaRequest(BaseModel):
     id_reserva: str
     habitacion_id: int
-    fecha_inicio: str # YYYY-MM-DD
-    fecha_fin: str # YYYY-MM-DD
+    fecha_inicio: date # YYYY-MM-DD
+    fecha_fin: date # YYYY-MM-DD
+
+    @model_validator(mode="after")
+    def validar_fechas(self):
+        if self.fecha_inicio >= self.fecha_fin:
+            raise ValueError("La fecha fin debe ser posterior al inicio")
+        return self
 
 
 @app.post("/reservas", status_code=201)
 def reservar(req: ReservaRequest):
+
+    # para insertar fechas en bd
+    inicio_str = req.fecha_inicio.isoformat()
+    fin_str = req.fecha_fin.isoformat()
+
     with get_db() as conn:
         # Idempotencia
         existente = conn.execute(
@@ -56,6 +79,13 @@ def reservar(req: ReservaRequest):
         ).fetchone()
 
         if existente:
+            # Si coincide la clave pero con otros parametros
+            if (
+                existente["habitacion_id"] != req.habitacion_id
+                or existente["fecha_inicio"] != inicio_str
+                or existente["fecha_final" != fin_str]
+            ):
+                raise HTTPException(status_code=409, detail="Idempotency Key en uso con datos distintos")
             return dict(existente)
 
         # Verificar fechas solapadas
@@ -66,7 +96,7 @@ def reservar(req: ReservaRequest):
                 AND estado = 'RESERVADA'
                 AND fecha_inicio < ?
                 AND fecha_fin > ?
-        """, (req.habitacion_id, req.fecha_fin, req.fecha_inicio)
+        """, (req.habitacion_id, fin_str, inicio_str)
         ).fetchone()
 
         if solapada:
@@ -76,10 +106,9 @@ def reservar(req: ReservaRequest):
         conn.execute("""
             INSERT INTO reservas (id_reserva, habitacion_id, fecha_inicio, fecha_fin, estado)
             VALUES (?, ?, ?, ?, 'RESERVADA')
-            """, (req.id_reserva, req.habitacion_id, req.fecha_inicio, req.fecha_fin,)
+            """, (req.id_reserva, req.habitacion_id, inicio_str, fin_str,)
         )
 
-        conn.commit()
 
     response = {
         "id_reserva": req.id_reserva,
@@ -104,8 +133,6 @@ def liberar_reserva(id_reserva: str):
         conn.execute(
             "UPDATE reservas SET estado = 'LIBERADA' WHERE id_reserva = ?", (id_reserva,)
         )
-
-        conn.commit()
 
     response = {
         "id_reserva": id_reserva,
