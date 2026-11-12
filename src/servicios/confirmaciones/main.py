@@ -19,28 +19,42 @@ caos_config = {
     "forzar_error": False
 }
 
+
 @contextmanager
-def get_db():
-    conn = sqlite3.connect(DB_NAME)
+def get_db(immediate: bool = True):
+    conn = sqlite3.connect(
+        DB_NAME,
+        timeout=10,
+        isolation_level=None
+    )
     conn.row_factory = sqlite3.Row
 
     try:
+        if immediate:
+            conn.execute("BEGIN IMMEDIATE")
+        else:
+            conn.execute("BEGIN")
         yield conn
+        conn.execute("COMMIT")
+    except:
+        if conn.in_transaction:
+            conn.execute("ROLLBACK")
+        raise
     finally:
         conn.close()
 
 def init_db():
-    with get_db() as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS vouchers (
-                id_voucher TEXT PRIMARY KEY,
-                id_reserva TEXT NOT NULL,
-                estado TEXT NOT NULL, -- 'EMITIDO' o 'ANULADO'
-                fecha_emision TEXT NOT NULL
-            )
-        """)
-        conn.commit()
-
+    conn = sqlite3.connect(DB_NAME)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS vouchers (
+            id_voucher TEXT PRIMARY KEY,
+            id_reserva TEXT NOT NULL,
+            estado TEXT NOT NULL, -- 'EMITIDO' o 'ANULADO'
+            fecha_emision TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
 
 init_db()
 
@@ -65,7 +79,6 @@ def configurar_caos(req: CaosRequest):
 @app.post("/confirmaciones", status_code=201)
 def emitir_confirmacion(req: ConfirmacionRequest):
 
-
     if caos_config["forzar_error"]:
         raise HTTPException(status_code=500, detail="Confirmacion no disponible (Error forzado)")
 
@@ -76,9 +89,11 @@ def emitir_confirmacion(req: ConfirmacionRequest):
         ).fetchone()
 
         if existente:
+            if existente["id_reserva"] != req.id_reserva:
+                raise HTTPException(status_code=409, detail="Idempotency Key en uso con datos distintos")
             return dict(existente)
 
-        fecha_actual = datetime.now(timezone.utc)
+        fecha_actual = datetime.now(timezone.utc).isoformat()
 
         # Guardar voucher
         conn.execute("""
@@ -86,8 +101,6 @@ def emitir_confirmacion(req: ConfirmacionRequest):
             VALUES (?, ?, 'EMITIDO', ?)
             """, (req.id_voucher, req.id_reserva, fecha_actual)
         )
-
-        conn.commit()
 
     response = {
         "id_voucher": req.id_voucher,
@@ -110,10 +123,9 @@ def anular_confirmacion(id_voucher: str):
             raise HTTPException(status_code=404, detail="voucher no encontrado")
 
         conn.execute(
-            "UPDATE vouchers SET estado = 'ANULADo' WHERE id_voucher = ?", (id_voucher,)
+            "UPDATE vouchers SET estado = 'ANULADO' WHERE id_voucher = ?", (id_voucher,)
         )
 
-        conn.commit()
 
     response = {
         "id_voucher": id_voucher,
@@ -125,12 +137,12 @@ def anular_confirmacion(id_voucher: str):
 
 @app.get("/confirmaciones/{id_voucher}")
 def obtener_voucher(id_voucher: str):
-    with get_db() as conn:
+    with get_db(immediate=False) as conn:
         voucher = conn.execute(
             "SELECT * FROM vouchers WHERE id_voucher = ?", (id_voucher,)
         ).fetchone()
 
         if not voucher:
-            raise HTTPException(status_code=404, detail="voucher no encontrada=o")
+            raise HTTPException(status_code=404, detail="voucher no encontrado")
 
         return dict(voucher)
