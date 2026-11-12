@@ -109,7 +109,7 @@ def reembolsar(id_pago: str):
     with get_db() as conn:
 
         pago = conn.execute(
-            "SELECT * FROM pago WHERE id_pago = ?", (id_pago,)
+            "SELECT * FROM pagos WHERE id_pago = ?", (id_pago,)
         ).fetchone()
 
         if not pago:
@@ -133,10 +133,10 @@ def reembolsar(id_pago: str):
 def obtener_pago(id_pago: str):
     with get_db() as conn:
         pago = conn.execute(
-            "SELECT * FROM pago WHERE id_pago = ?", (id_pago,)
+            "SELECT * FROM pagos WHERE id_pago = ?", (id_pago,)
         ).fetchone()
 
         if not pago:
-            raise HTTPException(status_code=404, detail="pago no encontrada=o")
+            raise HTTPException(status_code=404, detail="pago no encontrado")
 
         return dict(pago)
