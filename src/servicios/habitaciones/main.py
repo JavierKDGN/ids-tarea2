@@ -16,7 +16,7 @@ app = FastAPI(title="Servicio-Habitaciones")
 DB_NAME = "habitaciones.db"
 
 @contextmanager
-def get_db():
+def get_db(immediate: bool = True):
     conn = sqlite3.connect(
         DB_NAME,
         timeout=10,
@@ -25,7 +25,10 @@ def get_db():
     conn.row_factory = sqlite3.Row
 
     try:
-        conn.execute("BEGIN IMMEDIATE")
+        if immediate:
+            conn.execute("BEGIN IMMEDIATE")
+        else:
+            conn.execute("BEGIN")
         yield conn
         conn.execute("COMMIT")
     except:
@@ -83,7 +86,7 @@ def reservar(req: ReservaRequest):
             if (
                 existente["habitacion_id"] != req.habitacion_id
                 or existente["fecha_inicio"] != inicio_str
-                or existente["fecha_final" != fin_str]
+                or existente["fecha_fin"] != fin_str
             ):
                 raise HTTPException(status_code=409, detail="Idempotency Key en uso con datos distintos")
             return dict(existente)
@@ -144,7 +147,7 @@ def liberar_reserva(id_reserva: str):
 
 @app.get("/reservas/{id_reserva}")
 def obtener_reserva(id_reserva: str):
-    with get_db() as conn:
+    with get_db(immediate=False) as conn:
         reserva = conn.execute(
             "SELECT * FROM reservas WHERE id_reserva = ?", (id_reserva,)
         ).fetchone()
