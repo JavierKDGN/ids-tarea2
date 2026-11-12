@@ -10,7 +10,7 @@ import sqlite3
 import time
 from contextlib import contextmanager
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 app = FastAPI(title="Servicio-Pagos")
 DB_NAME = "pagos.db"
@@ -21,34 +21,47 @@ caos_config = {
 }
 
 @contextmanager
-def get_db():
-    conn = sqlite3.connect(DB_NAME)
+def get_db(immediate: bool = True):
+    conn = sqlite3.connect(
+        DB_NAME,
+        timeout=10,
+        isolation_level=None
+    )
     conn.row_factory = sqlite3.Row
 
     try:
+        if immediate:
+            conn.execute("BEGIN IMMEDIATE")
+        else:
+            conn.execute("BEGIN")
         yield conn
+        conn.execute("COMMIT")
+    except:
+        if conn.in_transaction:
+            conn.execute("ROLLBACK")
+        raise
     finally:
         conn.close()
 
 def init_db():
-    with get_db() as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS pagos (
-                id_pago TEXT PRIMARY KEY,
-                id_reserva TEXT NOT NULL,
-                monto REAL NOT NULL,
-                estado TEXT NOT NULL -- 'COBRADO' o 'REEMBOLSADO'
-            )
-        """)
-        conn.commit()
-
+    conn = sqlite3.connect(DB_NAME)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS pagos (
+            id_pago TEXT PRIMARY KEY,
+            id_reserva TEXT NOT NULL,
+            monto REAL NOT NULL,
+            estado TEXT NOT NULL -- 'COBRADO' o 'REEMBOLSADO'
+        )
+    """)
+    conn.commit()
+    conn.close()
 
 init_db()
 
 class PagoRequest(BaseModel):
     id_pago: str
     id_reserva: str
-    monto: float
+    monto: float = Field(gt=0)
 
 class CaosRequest(BaseModel):
     latencia_segundos: float = 0.0
@@ -83,6 +96,12 @@ def cobrar(req: PagoRequest):
         ).fetchone()
 
         if existente:
+            if (
+                existente["id_reserva"] != req.id_reserva
+                or existente["monto"] != req.monto
+            ):
+                raise HTTPException(status_code=409, detail="Idempotency Key en uso con datos distintos")
+
             return dict(existente)
 
         # Guardar pago
@@ -92,7 +111,6 @@ def cobrar(req: PagoRequest):
             """, (req.id_pago, req.id_reserva, req.monto)
         )
 
-        conn.commit()
 
     response = {
         "id_pago": req.id_pago,
@@ -119,8 +137,6 @@ def reembolsar(id_pago: str):
             "UPDATE pagos SET estado = 'REEMBOLSADO' WHERE id_pago = ?", (id_pago,)
         )
 
-        conn.commit()
-
     response = {
         "id_pago": id_pago,
         "estado": 'REEMBOLSADO',
@@ -131,7 +147,7 @@ def reembolsar(id_pago: str):
 
 @app.get("/pagos/{id_pago}")
 def obtener_pago(id_pago: str):
-    with get_db() as conn:
+    with get_db(immediate=False) as conn:
         pago = conn.execute(
             "SELECT * FROM pagos WHERE id_pago = ?", (id_pago,)
         ).fetchone()
