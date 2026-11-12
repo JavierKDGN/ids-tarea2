@@ -90,12 +90,12 @@ def reservar(req: ReservaRequest):
     return response
 
 # COMPENSACION para SAGA
-@app.post("reservas/{id_reserva}/liberar")
+@app.post("/reservas/{id_reserva}/liberar")
 def liberar_reserva(id_reserva: str):
     with get_db() as conn:
 
         reserva = conn.execute(
-            "SELECT * FROM reserva WHERE id_reserva = ?", (id_reserva,)
+            "SELECT * FROM reservas WHERE id_reserva = ?", (id_reserva,)
         ).fetchone()
 
         if not reserva:
@@ -119,7 +119,7 @@ def liberar_reserva(id_reserva: str):
 def obtener_reserva(id_reserva: str):
     with get_db() as conn:
         reserva = conn.execute(
-            "SELECT * FROM reserva WHERE id_reserva = ?", (id_reserva,)
+            "SELECT * FROM reservas WHERE id_reserva = ?", (id_reserva,)
         ).fetchone()
 
         if not reserva:

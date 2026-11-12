@@ -104,7 +104,7 @@ def cobrar(req: PagoRequest):
     return response
 
 # COMPENSACION para SAGA
-@app.post("pagos/{id_pago}/reembolsar")
+@app.post("/pagos/{id_pago}/reembolsar")
 def reembolsar(id_pago: str):
     with get_db() as conn:
 
