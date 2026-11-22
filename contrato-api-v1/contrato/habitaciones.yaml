@@ -1,0 +1,227 @@
+openapi: 3.0.3
+info:
+  title: Servicio Habitaciones - Contrato API v1
+  version: 1.0.0
+  description: |
+    Reserva y libera una habitacion para un rango de fechas. Base propia: SQLite (`HABITACIONES_DB`).
+    **Interno**: no se expone fuera de la red de Docker; el Gateway solo publica `GET /disponibilidad`.
+
+    Reglas de negocio:
+    - Una habitacion no puede reservarse dos veces en fechas superpuestas. Intervalo `[fecha_inicio, fecha_fin)`:
+      una salida y una entrada el mismo dia NO se solapan. Hay solapamiento si
+      `inicio_existente < fecha_fin_nueva` y `fin_existente > fecha_inicio_nueva`, solo contra reservas `RESERVADA`.
+    - `fecha_inicio` debe ser estrictamente menor que `fecha_fin`.
+    - Idempotencia: la clave es `id_reserva`. Repetir la misma reserva devuelve la existente sin duplicar;
+      reusar la clave con otros datos, o intentar reactivar una reserva liberada, responde 409.
+    - `liberar` es idempotente (liberar dos veces deja `LIBERADA`).
+
+    Estado por operacion: `x-estado` = `implementado` (coincide con el codigo actual),
+    `ajustar` (existe, requiere cambio; ver `x-ajuste`) o `nuevo` (aun no existe).
+    Ajuste global pendiente: formato de error `Error` y registro de `X-Correlation-ID` en logs
+    (este servicio hoy no tiene logging).
+servers:
+  - url: http://habitaciones:8001
+    description: Red interna de Docker Compose
+  - url: http://127.0.0.1:8001
+    description: Ejecucion local (scripts/levantar.sh)
+tags:
+  - name: Reservas
+  - name: Disponibilidad
+  - name: Operacion
+paths:
+  /reservas:
+    post:
+      tags: [Reservas]
+      operationId: habitaciones_reservar
+      summary: Reservar una habitacion (paso 1 de la Saga)
+      x-estado: implementado
+      parameters:
+        - $ref: './common.yaml#/components/parameters/XCorrelationID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReservaHabitacionRequest'
+            example:
+              id_reserva: res-3fa85f64b1c2
+              habitacion_id: 10
+              fecha_inicio: '2027-05-01'
+              fecha_fin: '2027-05-03'
+      responses:
+        '201':
+          description: |
+            Reserva creada, o repeticion idempotente de una reserva `RESERVADA` (misma respuesta).
+            En el caso de repeticion el cuerpo incluye ademas las fechas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservaHabitacion'
+              example:
+                id_reserva: res-3fa85f64b1c2
+                habitacion_id: 10
+                estado: RESERVADA
+        '409':
+          description: |
+            Conflicto. Codigos: `HABITACION_NO_DISPONIBLE` (fechas superpuestas),
+            `IDEMPOTENCY_CONFLICT` (misma `id_reserva` con otros datos),
+            `RESERVA_YA_LIBERADA` (la reserva existe pero fue liberada y no puede reactivarse).
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                error: conflicto
+                code: HABITACION_NO_DISPONIBLE
+                message: Habitacion no disponible en la fecha
+        '422':
+          $ref: './common.yaml#/components/responses/Validacion'
+
+  /reservas/{id_reserva}:
+    get:
+      tags: [Reservas]
+      operationId: habitaciones_obtener_reserva
+      summary: Consultar una reserva de habitacion
+      description: Usado por la Saga para verificar el estado real antes de decidir una compensacion, y por el BFF.
+      x-estado: implementado
+      parameters:
+        - $ref: './common.yaml#/components/parameters/IdReservaPath'
+        - $ref: './common.yaml#/components/parameters/XCorrelationID'
+      responses:
+        '200':
+          description: Reserva encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservaHabitacionCompleta'
+              example:
+                id_reserva: res-3fa85f64b1c2
+                habitacion_id: 10
+                fecha_inicio: '2027-05-01'
+                fecha_fin: '2027-05-03'
+                estado: RESERVADA
+        '404':
+          $ref: './common.yaml#/components/responses/NoEncontrado'
+
+  /reservas/{id_reserva}/liberar:
+    post:
+      tags: [Reservas]
+      operationId: habitaciones_liberar
+      summary: Liberar la habitacion (compensacion del paso 1)
+      description: Idempotente. Si la reserva ya estaba `LIBERADA`, responde igual con 200.
+      x-estado: implementado
+      parameters:
+        - $ref: './common.yaml#/components/parameters/IdReservaPath'
+        - $ref: './common.yaml#/components/parameters/XCorrelationID'
+      responses:
+        '200':
+          description: Habitacion liberada.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id_reserva, estado]
+                properties:
+                  id_reserva:
+                    $ref: './common.yaml#/components/schemas/IdReserva'
+                  estado:
+                    type: string
+                    enum: [LIBERADA]
+                  mensaje:
+                    type: string
+                    example: Compensacion Exitosa
+        '404':
+          $ref: './common.yaml#/components/responses/NoEncontrado'
+
+  /disponibilidad:
+    get:
+      tags: [Disponibilidad]
+      operationId: habitaciones_disponibilidad
+      summary: Consultar disponibilidad de una habitacion en un rango de fechas
+      description: |
+        Publicado por el Gateway como `GET /api/habitaciones/disponibilidad`.
+        Es de solo lectura y no depende de Pagos, por lo que sigue funcionando
+        cuando Pagos/la pasarela estan caidos (evidencia del escenario 3).
+      x-estado: implementado
+      parameters:
+        - name: habitacion_id
+          in: query
+          required: true
+          schema: {type: integer, minimum: 1}
+          example: 10
+        - name: fecha_inicio
+          in: query
+          required: true
+          schema:
+            $ref: './common.yaml#/components/schemas/Fecha'
+        - name: fecha_fin
+          in: query
+          required: true
+          schema:
+            $ref: './common.yaml#/components/schemas/Fecha'
+        - $ref: './common.yaml#/components/parameters/XCorrelationID'
+      responses:
+        '200':
+          description: Resultado de la consulta.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [habitacion_id, disponible]
+                properties:
+                  habitacion_id: {type: integer}
+                  disponible: {type: boolean}
+              example:
+                habitacion_id: 10
+                disponible: false
+        '422':
+          $ref: './common.yaml#/components/responses/Validacion'
+
+  /health:
+    get:
+      tags: [Operacion]
+      operationId: habitaciones_health
+      summary: Healthcheck (para Docker Compose)
+      x-estado: implementado
+      responses:
+        '200':
+          description: Servicio operativo.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Health'
+
+components:
+  schemas:
+    ReservaHabitacionRequest:
+      type: object
+      required: [id_reserva, habitacion_id, fecha_inicio, fecha_fin]
+      properties:
+        id_reserva:
+          $ref: './common.yaml#/components/schemas/IdReserva'
+        habitacion_id:
+          type: integer
+          minimum: 1
+        fecha_inicio:
+          $ref: './common.yaml#/components/schemas/Fecha'
+        fecha_fin:
+          $ref: './common.yaml#/components/schemas/Fecha'
+    ReservaHabitacion:
+      type: object
+      required: [id_reserva, habitacion_id, estado]
+      properties:
+        id_reserva:
+          $ref: './common.yaml#/components/schemas/IdReserva'
+        habitacion_id:
+          type: integer
+        fecha_inicio:
+          $ref: './common.yaml#/components/schemas/Fecha'
+        fecha_fin:
+          $ref: './common.yaml#/components/schemas/Fecha'
+        estado:
+          $ref: './common.yaml#/components/schemas/EstadoHabitacion'
+    ReservaHabitacionCompleta:
+      allOf:
+        - $ref: '#/components/schemas/ReservaHabitacion'
+        - type: object
+          required: [fecha_inicio, fecha_fin]

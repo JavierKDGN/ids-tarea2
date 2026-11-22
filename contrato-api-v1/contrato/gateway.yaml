@@ -1,0 +1,319 @@
+openapi: 3.0.3
+info:
+  title: API Gateway (contrato publico) - Hoteleria, Contrato API v1
+  version: 1.0.0
+  description: |
+    **Unico punto de entrada** al sistema. Es la unica API que ve el cliente; Habitaciones, Pagos, Confirmaciones,
+    Pasarela, Saga y BFF viven en la red interna de Docker y no publican puertos al host.
+
+    El Gateway **no tiene logica de negocio**: solo autentica, limita, enruta, aplica timeouts y propaga correlacion.
+    Cada operacion indica su destino en `x-upstream`. Las respuestas de negocio (cuerpos y codigos de 200/201/202/
+    404/409/422/502) son las del servicio destino, reenviadas sin modificar.
+
+    ## Autenticacion (central)
+    - `Authorization: Bearer <token>` en toda ruta `/api/*`. Falta o token invalido/expirado -> **401**.
+    - Propuesta: JWT HS256 firmado con un secreto compartido (`GATEWAY_JWT_SECRET`), con `sub` = id de cliente
+      y `exp`. Alternativa mas simple para el curso: tokens estaticos por cliente en variable de entorno.
+      El contrato solo exige el esquema Bearer.
+    - Los servicios internos confian en que la solicitud ya paso por el Gateway (no revalidan el token).
+    - `GET /health` no requiere token.
+
+    ## Rate limiting
+    - Por cliente (clave = `sub` del token; si no hay token valido, por IP). Limite propuesto: 60 solicitudes por minuto
+      (`RATE_LIMIT_PER_MINUTE`).
+    - Superado -> **429** con `Retry-After` (segundos). Las respuestas incluyen `X-RateLimit-Limit` y `X-RateLimit-Remaining`.
+
+    ## Correlacion
+    Acepta `X-Correlation-ID` del cliente o genera uno (UUID), lo reenvia a los servicios internos y lo devuelve en la respuesta.
+
+    ## Timeouts (propuestos; configurables)
+    | Ruta                                     | Limite del Gateway | Motivo                                                       |
+    |------------------------------------------|--------------------|--------------------------------------------------------------|
+    | `POST /api/reservas`                     | 10 s               | Saga sincrona: hasta 3 pasos + posibles compensaciones       |
+    | `POST /api/reservas/{id}/reconciliar`    | 10 s               | Idem                                                         |
+    | `GET` (consultas y resumen)              | 4 s                | El BFF espera como maximo ~2 s por fuente, en paralelo       |
+
+    Si vence el limite -> **504** `UPSTREAM_TIMEOUT`. **La Saga puede seguir ejecutandose**: el cliente debe
+    reintentar `POST /api/reservas` con la **misma** `Idempotency-Key` (o consultar `GET /api/reservas/{id}`).
+    Si el destino no responde (conexion rechazada) -> **503** `UPSTREAM_NO_DISPONIBLE`. Se usa 503 (no 502) para no
+    confundirlo con el 502 de negocio `COMPENSADA`; ademas, el cuerpo de un error del Gateway tiene forma `Error`
+    (`error/code/message`), mientras que el de la Saga tiene `estado`.
+
+    ## Rutas NO publicadas
+    Pagos, Confirmaciones, Pasarela y sus endpoints de demo (`/chaos`, `/metricas`, `/demo/*`) no se exponen.
+    Para los escenarios de falla se activan dentro de la red (`docker compose exec`); ver README.
+
+    `x-estado`: todas **nuevo** (el Gateway aun no existe).
+servers:
+  - url: http://localhost:8080
+    description: Unico puerto publicado por docker compose (propuesto)
+tags:
+  - name: Reservas
+  - name: Disponibilidad
+  - name: Operacion
+security:
+  - bearerAuth: []
+paths:
+  /api/reservas:
+    post:
+      tags: [Reservas]
+      operationId: gw_crear_reserva
+      summary: Reservar una habitacion (inicia la Saga)
+      description: |
+        Camino feliz -> 201 `CONFIRMADA`. Fallo del ultimo paso -> 502 `COMPENSADA` (reembolso y liberacion hechos).
+        Pago inseguro/incierto -> 202 `PENDIENTE_PAGO`. Habitacion ocupada -> 409 `FALLIDA`.
+      x-estado: nuevo
+      x-upstream: 'saga: POST /reservas'
+      parameters:
+        - $ref: './saga.yaml#/components/parameters/IdempotencyKey'
+        - $ref: './common.yaml#/components/parameters/XCorrelationID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: './saga.yaml#/components/schemas/ReservaRequest'
+            example:
+              habitacion_id: 10
+              fecha_inicio: '2027-05-01'
+              fecha_fin: '2027-05-03'
+              monto: '125.50'
+      responses:
+        '200':
+          $ref: './saga.yaml#/components/responses/SagaConfirmadaReintento'
+        '201':
+          $ref: './saga.yaml#/components/responses/SagaConfirmadaNueva'
+        '202':
+          $ref: './saga.yaml#/components/responses/SagaEnCurso'
+        '401':
+          $ref: '#/components/responses/NoAutorizado'
+        '409':
+          $ref: './saga.yaml#/components/responses/SagaFallidaOConflicto'
+        '422':
+          $ref: './common.yaml#/components/responses/Validacion'
+        '429':
+          $ref: '#/components/responses/LimiteExcedido'
+        '502':
+          $ref: './saga.yaml#/components/responses/SagaCompensada'
+        '503':
+          $ref: '#/components/responses/UpstreamNoDisponible'
+        '504':
+          $ref: '#/components/responses/UpstreamTimeout'
+
+  /api/reservas/{id_reserva}:
+    get:
+      tags: [Reservas]
+      operationId: gw_obtener_reserva
+      summary: Estado global de la reserva (Saga)
+      x-estado: nuevo
+      x-upstream: 'saga: GET /reservas/{id_reserva}'
+      parameters:
+        - $ref: './common.yaml#/components/parameters/IdReservaPath'
+        - $ref: './common.yaml#/components/parameters/XCorrelationID'
+      responses:
+        '200':
+          description: La reserva existe; el estado esta en `estado`.
+          content:
+            application/json:
+              schema:
+                $ref: './saga.yaml#/components/schemas/ReservaSaga'
+        '401':
+          $ref: '#/components/responses/NoAutorizado'
+        '404':
+          $ref: './common.yaml#/components/responses/NoEncontrado'
+        '429':
+          $ref: '#/components/responses/LimiteExcedido'
+        '503':
+          $ref: '#/components/responses/UpstreamNoDisponible'
+        '504':
+          $ref: '#/components/responses/UpstreamTimeout'
+
+  /api/reservas/{id_reserva}/reconciliar:
+    post:
+      tags: [Reservas]
+      operationId: gw_reconciliar_reserva
+      summary: Reintentar una reserva pendiente
+      description: Reanuda una Saga `PENDIENTE_*` (p. ej. pago incierto). Idempotente.
+      x-estado: nuevo
+      x-upstream: 'saga: POST /reservas/{id_reserva}/reconciliar'
+      parameters:
+        - $ref: './common.yaml#/components/parameters/IdReservaPath'
+        - $ref: './common.yaml#/components/parameters/XCorrelationID'
+      responses:
+        '200':
+          $ref: './saga.yaml#/components/responses/SagaConfirmadaReintento'
+        '202':
+          $ref: './saga.yaml#/components/responses/SagaEnCurso'
+        '401':
+          $ref: '#/components/responses/NoAutorizado'
+        '404':
+          $ref: './common.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './saga.yaml#/components/responses/SagaFallidaOConflicto'
+        '429':
+          $ref: '#/components/responses/LimiteExcedido'
+        '502':
+          $ref: './saga.yaml#/components/responses/SagaCompensada'
+        '503':
+          $ref: '#/components/responses/UpstreamNoDisponible'
+        '504':
+          $ref: '#/components/responses/UpstreamTimeout'
+
+  /api/reservas/{id_reserva}/resumen:
+    get:
+      tags: [Reservas]
+      operationId: gw_resumen_reserva
+      summary: Vista agregada de la reserva (BFF web)
+      description: |
+        Compone Saga + Habitaciones + Confirmaciones en una sola respuesta. Funciona aunque Pagos este caido.
+      x-estado: nuevo
+      x-upstream: 'bff: GET /api/reservas/{id_reserva}/resumen'
+      parameters:
+        - $ref: './common.yaml#/components/parameters/IdReservaPath'
+        - $ref: './common.yaml#/components/parameters/XCorrelationID'
+      responses:
+        '200':
+          description: Resumen compuesto (posiblemente degradado).
+          content:
+            application/json:
+              schema:
+                $ref: './bff.yaml#/components/schemas/ResumenReserva'
+        '401':
+          $ref: '#/components/responses/NoAutorizado'
+        '404':
+          $ref: './common.yaml#/components/responses/NoEncontrado'
+        '429':
+          $ref: '#/components/responses/LimiteExcedido'
+        '503':
+          $ref: '#/components/responses/UpstreamNoDisponible'
+        '504':
+          $ref: '#/components/responses/UpstreamTimeout'
+
+  /api/habitaciones/disponibilidad:
+    get:
+      tags: [Disponibilidad]
+      operationId: gw_disponibilidad
+      summary: Consultar disponibilidad de una habitacion
+      description: Solo lectura; independiente de Pagos.
+      x-estado: nuevo
+      x-upstream: 'habitaciones: GET /disponibilidad'
+      parameters:
+        - name: habitacion_id
+          in: query
+          required: true
+          schema: {type: integer, minimum: 1}
+          example: 10
+        - name: fecha_inicio
+          in: query
+          required: true
+          schema:
+            $ref: './common.yaml#/components/schemas/Fecha'
+        - name: fecha_fin
+          in: query
+          required: true
+          schema:
+            $ref: './common.yaml#/components/schemas/Fecha'
+        - $ref: './common.yaml#/components/parameters/XCorrelationID'
+      responses:
+        '200':
+          description: Resultado de la consulta.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [habitacion_id, disponible]
+                properties:
+                  habitacion_id: {type: integer}
+                  disponible: {type: boolean}
+        '401':
+          $ref: '#/components/responses/NoAutorizado'
+        '422':
+          $ref: './common.yaml#/components/responses/Validacion'
+        '429':
+          $ref: '#/components/responses/LimiteExcedido'
+        '503':
+          $ref: '#/components/responses/UpstreamNoDisponible'
+        '504':
+          $ref: '#/components/responses/UpstreamTimeout'
+
+  /health:
+    get:
+      tags: [Operacion]
+      operationId: gw_health
+      summary: Healthcheck del Gateway
+      security: []
+      x-estado: nuevo
+      responses:
+        '200':
+          description: Gateway operativo.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Health'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token validado centralmente por el Gateway.
+  responses:
+    NoAutorizado:
+      description: 'Falta el token, es invalido o expiro. `code: NO_AUTORIZADO`.'
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+          example: Bearer
+      content:
+        application/json:
+          schema:
+            $ref: './common.yaml#/components/schemas/Error'
+          example:
+            error: no_autorizado
+            code: NO_AUTORIZADO
+            message: Token ausente o invalido
+    LimiteExcedido:
+      description: 'Se supero el limite de solicitudes del cliente. `code: LIMITE_EXCEDIDO`.'
+      headers:
+        Retry-After:
+          description: Segundos hasta poder reintentar.
+          schema:
+            type: integer
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: './common.yaml#/components/schemas/Error'
+          example:
+            error: limite_excedido
+            code: LIMITE_EXCEDIDO
+            message: Demasiadas solicitudes; reintente mas tarde
+    UpstreamNoDisponible:
+      description: 'El servicio destino no acepta conexiones. `code: UPSTREAM_NO_DISPONIBLE`.'
+      content:
+        application/json:
+          schema:
+            $ref: './common.yaml#/components/schemas/Error'
+          example:
+            error: no_disponible
+            code: UPSTREAM_NO_DISPONIBLE
+            message: Servicio no disponible
+    UpstreamTimeout:
+      description: |
+        El destino no respondio dentro del limite del Gateway. `code: UPSTREAM_TIMEOUT`.
+        En `POST /api/reservas` la Saga puede seguir ejecutandose: reintentar con la misma `Idempotency-Key`.
+      content:
+        application/json:
+          schema:
+            $ref: './common.yaml#/components/schemas/Error'
+          example:
+            error: timeout
+            code: UPSTREAM_TIMEOUT
+            message: El servicio no respondio a tiempo

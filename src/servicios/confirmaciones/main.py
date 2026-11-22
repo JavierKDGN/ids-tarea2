@@ -6,6 +6,7 @@ Responsabilidades:
 - Control de falla: Hacer fallar para probar SAGA
 """
 
+import os
 import sqlite3
 from datetime import datetime, timezone
 from contextlib import contextmanager
@@ -13,7 +14,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 app = FastAPI(title="Servicio-Confirmacion")
-DB_NAME = "confirmaciones.db"
+DB_NAME = os.getenv("CONFIRMACIONES_DB", "confirmaciones.db")
 
 caos_config = {
     "forzar_error": False
@@ -91,6 +92,8 @@ def emitir_confirmacion(req: ConfirmacionRequest):
         if existente:
             if existente["id_reserva"] != req.id_reserva:
                 raise HTTPException(status_code=409, detail="Idempotency Key en uso con datos distintos")
+            if existente["estado"] != "EMITIDO":
+                raise HTTPException(status_code=409, detail="El voucher ya fue anulado y no puede reemitirse")
             return dict(existente)
 
         fecha_actual = datetime.now(timezone.utc).isoformat()
@@ -146,3 +149,15 @@ def obtener_voucher(id_voucher: str):
             raise HTTPException(status_code=404, detail="voucher no encontrado")
 
         return dict(voucher)
+
+@app.get("/confirmaciones/reserva/{id_reserva}")
+def obtener_por_reserva(id_reserva: str):
+    with get_db(immediate=False) as conn:
+        voucher = conn.execute("SELECT * FROM vouchers WHERE id_reserva = ? ORDER BY fecha_emision DESC LIMIT 1", (id_reserva,)).fetchone()
+        if not voucher:
+            raise HTTPException(status_code=404, detail="Confirmacion no encontrada")
+        return dict(voucher)
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}

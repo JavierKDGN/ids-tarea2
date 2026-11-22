@@ -1,0 +1,192 @@
+openapi: 3.0.3
+info:
+  title: BFF web - Contrato API v1
+  version: 1.0.0
+  description: |
+    Backend For Frontend para el cliente web. Compone en **una sola respuesta** datos de tres fuentes:
+    Saga (estado global), Habitaciones (datos de la habitacion) y Confirmaciones (voucher).
+    **Interno**: se publica por el Gateway como `GET /api/reservas/{id_reserva}/resumen`.
+
+    Reglas de diseno:
+    - Solo lectura: consume los endpoints existentes; NO duplica reglas de negocio ni toca las bases de datos
+      de otros servicios; NO inicia ni avanza la Saga.
+    - **No depende de Pagos** a proposito: el resumen sigue funcionando cuando Pagos o la pasarela estan caidos
+      (evidencia del escenario 3: "el resto del sistema sigue respondiendo").
+    - Las tres llamadas salen **en paralelo**, cada una con timeout (`BFF_TIMEOUT`, propuesta 2.0 s).
+    - Degradacion elegante: la Saga es la fuente obligatoria. Si Habitaciones o Confirmaciones fallan, responde 200
+      con esa seccion en `null`, `degradado: true` y la causa en `fuentes`.
+    - Tolerancia: mientras `GET /reservas/{id}` de la Saga no responda 200 para estados terminales, el BFF debe
+      aceptar tambien 202/409/502 cuando el cuerpo sea `ReservaSaga`.
+
+    `x-estado`: **nuevo** (no existe aun). El `bff/main.py` actual es una version antigua que duplica la
+    orquestacion, no compensa y falla al serializar fechas; debe reemplazarse, y `bff/saga.py` eliminarse.
+servers:
+  - url: http://bff:8005
+    description: Red interna de Docker Compose 
+tags:
+  - name: Vistas
+  - name: Operacion
+paths:
+  /api/reservas/{id_reserva}/resumen:
+    get:
+      tags: [Vistas]
+      operationId: bff_resumen_reserva
+      summary: Vista agregada de una reserva
+      x-estado: nuevo
+      x-fuentes:
+        - 'saga: GET /reservas/{id_reserva}  (obligatoria)'
+        - 'habitaciones: GET /reservas/{id_reserva}'
+        - 'confirmaciones: GET /confirmaciones/reserva/{id_reserva}'
+      parameters:
+        - $ref: './common.yaml#/components/parameters/IdReservaPath'
+        - $ref: './common.yaml#/components/parameters/XCorrelationID'
+      responses:
+        '200':
+          description: Resumen compuesto (posiblemente degradado).
+          headers:
+            X-Correlation-ID:
+              $ref: './common.yaml#/components/headers/XCorrelationID'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumenReserva'
+              examples:
+                completo:
+                  summary: Camino feliz
+                  value:
+                    id_reserva: res-3fa85f64b1c2
+                    mensaje: Reserva confirmada
+                    degradado: false
+                    saga:
+                      estado: CONFIRMADA
+                      error: null
+                      actualizado: '2026-11-22T02:17:32.918000+00:00'
+                    habitacion:
+                      habitacion_id: 10
+                      fecha_inicio: '2027-05-01'
+                      fecha_fin: '2027-05-03'
+                      estado: RESERVADA
+                    confirmacion:
+                      id_voucher: voucher-res-3fa85f64b1c2
+                      estado: EMITIDO
+                      fecha_emision: '2026-11-22T02:17:32.910000+00:00'
+                    fuentes:
+                      saga: OK
+                      habitacion: OK
+                      confirmacion: OK
+                    generado: '2026-11-22T02:20:00+00:00'
+                compensada_y_degradada:
+                  summary: Saga compensada y Confirmaciones caido
+                  value:
+                    id_reserva: res-3fa85f64b1c2
+                    mensaje: La reserva no pudo completarse y fue revertida
+                    degradado: true
+                    saga:
+                      estado: COMPENSADA
+                      error: 'Confirmacion: HTTP 500'
+                      actualizado: '2026-11-22T02:17:33.249000+00:00'
+                    habitacion:
+                      habitacion_id: 10
+                      fecha_inicio: '2027-05-01'
+                      fecha_fin: '2027-05-03'
+                      estado: LIBERADA
+                    confirmacion: null
+                    fuentes:
+                      saga: OK
+                      habitacion: OK
+                      confirmacion: NO_DISPONIBLE
+                    generado: '2026-11-22T02:20:00+00:00'
+        '404':
+          $ref: './common.yaml#/components/responses/NoEncontrado'
+        '503':
+          description: 'La Saga (fuente obligatoria) no esta disponible. `code: SAGA_NO_DISPONIBLE`.'
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                error: no_disponible
+                code: SAGA_NO_DISPONIBLE
+                message: No se pudo consultar el estado de la reserva
+  /health:
+    get:
+      tags: [Operacion]
+      operationId: bff_health
+      summary: Healthcheck
+      x-estado: nuevo
+      responses:
+        '200':
+          description: Servicio operativo.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Health'
+
+components:
+  schemas:
+    ResumenReserva:
+      type: object
+      required: [id_reserva, mensaje, degradado, saga, habitacion, confirmacion, fuentes, generado]
+      properties:
+        id_reserva:
+          $ref: './common.yaml#/components/schemas/IdReserva'
+        mensaje:
+          type: string
+          description: Texto listo para mostrar al usuario, derivado del estado de la Saga.
+        degradado:
+          type: boolean
+          description: '`true` si alguna fuente no respondio (ver `fuentes`).'
+        saga:
+          type: object
+          required: [estado, actualizado]
+          properties:
+            estado:
+              $ref: './common.yaml#/components/schemas/EstadoSaga'
+            error:
+              type: string
+              nullable: true
+            actualizado:
+              $ref: './common.yaml#/components/schemas/DateTime'
+        habitacion:
+          type: object
+          nullable: true
+          description: '`null` si Habitaciones no respondio o no tiene la reserva.'
+          required: [habitacion_id, fecha_inicio, fecha_fin, estado]
+          properties:
+            habitacion_id: {type: integer}
+            fecha_inicio:
+              $ref: './common.yaml#/components/schemas/Fecha'
+            fecha_fin:
+              $ref: './common.yaml#/components/schemas/Fecha'
+            estado:
+              $ref: './common.yaml#/components/schemas/EstadoHabitacion'
+        confirmacion:
+          type: object
+          nullable: true
+          description: '`null` si aun no se emitio voucher o Confirmaciones no respondio.'
+          required: [id_voucher, estado]
+          properties:
+            id_voucher:
+              $ref: './common.yaml#/components/schemas/IdVoucher'
+            estado:
+              $ref: './common.yaml#/components/schemas/EstadoVoucher'
+            fecha_emision:
+              $ref: './common.yaml#/components/schemas/DateTime'
+        fuentes:
+          type: object
+          required: [saga, habitacion, confirmacion]
+          description: |
+            Resultado por fuente: `OK`, `NO_EXISTE` (el servicio respondio 404, p. ej. aun no hay voucher)
+            o `NO_DISPONIBLE` (timeout o error: degradacion).
+          properties:
+            saga:
+              $ref: '#/components/schemas/EstadoFuente'
+            habitacion:
+              $ref: '#/components/schemas/EstadoFuente'
+            confirmacion:
+              $ref: '#/components/schemas/EstadoFuente'
+        generado:
+          $ref: './common.yaml#/components/schemas/DateTime'
+    EstadoFuente:
+      type: string
+      enum: [OK, NO_EXISTE, NO_DISPONIBLE]

@@ -1,0 +1,162 @@
+openapi: 3.0.3
+info:
+  title: Contrato API v1 - componentes comunes
+  version: 1.0.0
+  description: |
+    Esquemas, parametros y respuestas compartidos por todas las especificaciones
+    de `contrato/`. No define rutas. Las demas especificaciones lo referencian con
+    `$ref: './common.yaml#/components/...'`.
+
+    Convenciones (resumen; detalle en `contrato/README.md`):
+    - Identificadores: `id_reserva` (lo genera la Saga si el cliente no lo envia),
+      `id_pago = pay-{id_reserva}`, `id_voucher = voucher-{id_reserva}`.
+    - Fechas `YYYY-MM-DD`, estadia como intervalo semiabierto `[fecha_inicio, fecha_fin)`.
+    - Montos: decimal como **string** con 2 decimales (`"125.50"`). Nunca `float`.
+      Internamente Pagos guarda `monto_centavos` (entero). Moneda unica del hotel,
+      no se transmite.
+    - Trazabilidad: cabecera `X-Correlation-ID` en toda llamada; se propaga y se registra en logs.
+    - Errores: `{ "error", "code", "message" }` (ver esquema `Error`).
+paths: {}
+components:
+  parameters:
+    XCorrelationID:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      description: |
+        Identificador de correlacion. Si falta, el Gateway genera uno; los servicios
+        internos lo reciben, lo registran en sus logs y lo propagan a cada llamada saliente.
+        La Saga usa `id_reserva` como correlacion en sus llamadas a los servicios.
+      schema:
+        type: string
+        maxLength: 128
+      example: res-3fa85f64b1c2
+    IdReservaPath:
+      name: id_reserva
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/IdReserva'
+
+  headers:
+    XCorrelationID:
+      description: Eco del identificador de correlacion recibido o generado.
+      schema:
+        type: string
+
+  responses:
+    Validacion:
+      description: Solicitud invalida (campos faltantes, formato o reglas de validacion).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: validacion
+            code: VALIDACION_FALLIDA
+            message: La fecha fin debe ser posterior al inicio
+    NoEncontrado:
+      description: El recurso no existe.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: no_encontrado
+            code: RECURSO_NO_ENCONTRADO
+            message: Reserva no encontrada
+
+  schemas:
+    Error:
+      type: object
+      required: [error, code, message]
+      description: |
+        Formato de error comun a Gateway, BFF, Saga, Habitaciones, Confirmaciones y Pagos.
+        La Pasarela externa simulada NO lo usa (es un tercero; ver `pasarela.yaml`).
+        AJUSTE REQUERIDO: hoy FastAPI responde `{"detail": ...}`; cada servicio debe
+        registrar un manejador global de `HTTPException` y `RequestValidationError`.
+      properties:
+        error:
+          type: string
+          description: Categoria corta del error.
+          enum: [validacion, no_encontrado, conflicto, no_disponible, no_autorizado, limite_excedido, timeout, error_interno]
+        code:
+          type: string
+          description: Codigo estable en MAYUSCULAS (catalogo en `contrato/README.md`).
+          example: HABITACION_NO_DISPONIBLE
+        message:
+          type: string
+          description: Texto legible para personas.
+        detalle:
+          description: Informacion adicional opcional (por ejemplo, la lista de errores de validacion).
+          nullable: true
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+
+    IdReserva:
+      type: string
+      pattern: '^[A-Za-z0-9_-]{1,80}$'
+      example: res-3fa85f64b1c2
+    IdPago:
+      type: string
+      description: Por convencion `pay-{id_reserva}`; lo deriva la Saga.
+      example: pay-res-3fa85f64b1c2
+    IdVoucher:
+      type: string
+      description: Por convencion `voucher-{id_reserva}`; lo deriva la Saga.
+      example: voucher-res-3fa85f64b1c2
+    Fecha:
+      type: string
+      format: date
+      description: Formato `YYYY-MM-DD`.
+      example: '2027-05-01'
+    Monto:
+      type: string
+      pattern: '^[0-9]{1,10}(\.[0-9]{1,2})?$'
+      description: Decimal como string, maximo 2 decimales y 10 digitos enteros. Mayor que cero.
+      example: '125.50'
+    DateTime:
+      type: string
+      format: date-time
+      description: ISO 8601 en UTC.
+      example: '2026-11-22T02:17:32.918000+00:00'
+
+    EstadoHabitacion:
+      type: string
+      enum: [RESERVADA, LIBERADA]
+    EstadoPago:
+      type: string
+      description: |
+        `EN_PROCESO`: cobro en curso. `COBRADO`: confirmado por la pasarela.
+        `RECHAZADO`: se sabe con certeza que NO se cobro (circuito abierto, bulkhead lleno,
+        sin conexion o pasarela respondio NO_COBRADO). `INCIERTO`: hubo timeout o error
+        ambiguo; podria haberse cobrado despues, hay que reconciliar. `REEMBOLSADO`.
+      enum: [EN_PROCESO, COBRADO, RECHAZADO, INCIERTO, REEMBOLSADO]
+    EstadoVoucher:
+      type: string
+      enum: [EMITIDO, ANULADO]
+    EstadoSaga:
+      type: string
+      description: |
+        Terminales: `CONFIRMADA`, `COMPENSADA`, `FALLIDA`.
+        Transitorios: `INICIADA`, `HABITACION_RESERVADA`, `PAGO_COBRADO`, `COMPENSANDO`.
+        Pendientes (requieren reconciliacion): `PENDIENTE_HABITACION`, `PENDIENTE_PAGO`,
+        `PENDIENTE_CONFIRMACION`, `PENDIENTE_VERIFICACION`, `PENDIENTE_COMPENSACION`.
+      enum:
+        - INICIADA
+        - HABITACION_RESERVADA
+        - PAGO_COBRADO
+        - CONFIRMADA
+        - COMPENSANDO
+        - COMPENSADA
+        - FALLIDA
+        - PENDIENTE_HABITACION
+        - PENDIENTE_PAGO
+        - PENDIENTE_CONFIRMACION
+        - PENDIENTE_VERIFICACION
+        - PENDIENTE_COMPENSACION

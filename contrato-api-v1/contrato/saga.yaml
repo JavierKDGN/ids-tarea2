@@ -1,0 +1,272 @@
+openapi: 3.0.3
+info:
+  title: Coordinador de la Saga (orquestador de reservas) - Contrato API v1
+  version: 1.0.0
+  description: |
+    Orquesta la operacion "Reservar una habitacion". Base propia: SQLite (`SAGA_DB`). **Interno**: el Gateway
+    publica `POST /reservas` y `GET /reservas/{id}` como `/api/reservas...`.
+
+    ## Secuencia y compensaciones (orquestacion)
+    | Paso | Accion                         | Servicio       | Compensacion                         |
+    |------|--------------------------------|----------------|--------------------------------------|
+    | 1    | Reservar habitacion            | Habitaciones   | `POST /reservas/{id}/liberar`        |
+    | 2    | Cobrar garantia                | Pagos          | `POST /pagos/{id}/reembolsar`        |
+    | 3    | Emitir confirmacion            | Confirmaciones | `POST /confirmaciones/{id}/anular`   |
+
+    Compensacion en **orden inverso** y solo de lo que realmente se completo: anular voucher -> reembolsar -> liberar.
+    Antes de cada decision consulta el estado real en el servicio dueño. Si el reembolso no se confirma, NO se libera
+    la habitacion (evita un cobro huerfano) y la Saga queda `PENDIENTE_COMPENSACION`.
+
+    ## Estados inciertos
+    Un timeout hacia Pagos NO se interpreta como "no cobrado": la Saga queda `PENDIENTE_PAGO` y concilia
+    (`/pagos/{id}/reconciliar`) antes de compensar. Los estados `PENDIENTE_*` se resuelven con
+    `POST /reservas/{id_reserva}/reconciliar` (hoy manual; un reconciliador automatico es un pendiente).
+
+    ## Idempotencia
+    - `id_reserva` opcional en la solicitud: si falta, la Saga genera `res-{12 hex}`.
+    - Cabecera `Idempotency-Key` (recomendada): identifica la solicitud del cliente. Repetir la misma
+      solicitud (misma clave o mismo `id_reserva` y mismos datos) devuelve la Saga existente sin crear otra
+      reserva ni otro cobro. Misma clave/`id_reserva` con datos distintos -> 409 `IDEMPOTENCY_CONFLICT`.
+    - `id_pago = pay-{id_reserva}` e `id_voucher = voucher-{id_reserva}` son deterministas, por lo que
+      cada paso y compensacion es idempotente hacia los servicios.
+
+    ## Mapeo del estado de la Saga a HTTP (POST /reservas y /reconciliar)
+    | `estado`            | HTTP                         |
+    |---------------------|------------------------------|
+    | `CONFIRMADA`        | 201 (recien creada) / 200    |
+    | `COMPENSADA`        | 502                          |
+    | `FALLIDA`           | 409 (p. ej. habitacion no disponible) |
+    | cualquier otro      | 202 (en curso o pendiente)   |
+
+    Nunca se informa un cobro aprobado si Pagos no lo confirmo.
+
+    ## Timeouts
+    Toda llamada saliente usa `SERVICES_TIMEOUT` (def. 2.5 s).
+
+    `x-estado`: `implementado` | `ajustar` | `nuevo`. Ajuste global pendiente: formato de error `Error`.
+    Retirar el alias temporal `POST /api/reservar` (no forma parte del contrato).
+servers:
+  - url: http://saga:8000
+    description: Red interna de Docker Compose
+  - url: http://127.0.0.1:8000
+    description: Ejecucion local
+tags:
+  - name: Reservas
+  - name: Operacion
+paths:
+  /reservas:
+    post:
+      tags: [Reservas]
+      operationId: saga_crear_reserva
+      summary: Iniciar la operacion completa de reserva
+      description: 'Sincrona: responde cuando la Saga llega a un estado terminal o pendiente.'
+      x-estado: implementado
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: './common.yaml#/components/parameters/XCorrelationID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReservaRequest'
+            example:
+              habitacion_id: 10
+              fecha_inicio: '2027-05-01'
+              fecha_fin: '2027-05-03'
+              monto: '125.50'
+      responses:
+        '200':
+          $ref: '#/components/responses/SagaConfirmadaReintento'
+        '201':
+          $ref: '#/components/responses/SagaConfirmadaNueva'
+        '202':
+          $ref: '#/components/responses/SagaEnCurso'
+        '409':
+          $ref: '#/components/responses/SagaFallidaOConflicto'
+        '422':
+          $ref: './common.yaml#/components/responses/Validacion'
+        '502':
+          $ref: '#/components/responses/SagaCompensada'
+
+  /reservas/{id_reserva}:
+    get:
+      tags: [Reservas]
+      operationId: saga_obtener_reserva
+      summary: Consultar el estado global de la Saga
+      description: |
+        Usado por el BFF y por clientes que no recibieron respuesta (por ejemplo tras un 504 del Gateway).
+        Solo lectura: no avanza la Saga.
+      x-estado: ajustar
+      x-ajuste: |
+        Hoy reutiliza el mapeo de `POST` y devuelve 502 para `COMPENSADA`, 409 para `FALLIDA` y 202 para estados
+        pendientes. Una consulta debe responder **200** siempre que la Saga exista (el estado va en `estado`).
+        Mientras no se aplique, el BFF debe aceptar cualquiera de esos codigos si el cuerpo es `ReservaSaga`.
+      parameters:
+        - $ref: './common.yaml#/components/parameters/IdReservaPath'
+        - $ref: './common.yaml#/components/parameters/XCorrelationID'
+      responses:
+        '200':
+          description: La Saga existe; el estado esta en el cuerpo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservaSaga'
+              example:
+                id_reserva: res-3fa85f64b1c2
+                id_pago: pay-res-3fa85f64b1c2
+                id_voucher: voucher-res-3fa85f64b1c2
+                estado: COMPENSADA
+                error: 'Confirmacion: HTTP 500'
+                actualizado: '2026-11-22T02:17:33.249000+00:00'
+        '404':
+          $ref: './common.yaml#/components/responses/NoEncontrado'
+
+  /reservas/{id_reserva}/reconciliar:
+    post:
+      tags: [Reservas]
+      operationId: saga_reconciliar
+      summary: Reintentar el avance de una Saga pendiente
+      description: |
+        Reanuda la Saga desde su estado actual (verifica pagos inciertos, completa compensaciones pendientes).
+        Idempotente. Si la Saga ya esta en ejecucion en otra solicitud, devuelve el estado vigente.
+      x-estado: implementado
+      parameters:
+        - $ref: './common.yaml#/components/parameters/IdReservaPath'
+        - $ref: './common.yaml#/components/parameters/XCorrelationID'
+      responses:
+        '200':
+          $ref: '#/components/responses/SagaConfirmadaReintento'
+        '202':
+          $ref: '#/components/responses/SagaEnCurso'
+        '404':
+          $ref: './common.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/SagaFallidaOConflicto'
+        '502':
+          $ref: '#/components/responses/SagaCompensada'
+
+  /health:
+    get:
+      tags: [Operacion]
+      operationId: saga_health
+      summary: Healthcheck
+      x-estado: implementado
+      responses:
+        '200':
+          description: Servicio operativo.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Health'
+
+components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: Clave de idempotencia de la solicitud del cliente (maximo 128 caracteres, no vacia). Recomendada.
+      schema:
+        type: string
+        maxLength: 128
+      example: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+  schemas:
+    ReservaRequest:
+      type: object
+      required: [habitacion_id, fecha_inicio, fecha_fin, monto]
+      properties:
+        habitacion_id:
+          type: integer
+          minimum: 1
+        fecha_inicio:
+          $ref: './common.yaml#/components/schemas/Fecha'
+        fecha_fin:
+          allOf:
+            - $ref: './common.yaml#/components/schemas/Fecha'
+          description: Debe ser posterior a `fecha_inicio` (intervalo semiabierto).
+        monto:
+          $ref: './common.yaml#/components/schemas/Monto'
+        id_reserva:
+          allOf:
+            - $ref: './common.yaml#/components/schemas/IdReserva'
+          description: Opcional. Si falta, la Saga lo genera.
+    ReservaSaga:
+      type: object
+      required: [id_reserva, id_pago, id_voucher, estado, actualizado]
+      properties:
+        id_reserva:
+          $ref: './common.yaml#/components/schemas/IdReserva'
+        id_pago:
+          $ref: './common.yaml#/components/schemas/IdPago'
+        id_voucher:
+          $ref: './common.yaml#/components/schemas/IdVoucher'
+        estado:
+          $ref: './common.yaml#/components/schemas/EstadoSaga'
+        error:
+          type: string
+          nullable: true
+          description: Motivo del ultimo fallo o de la compensacion, si lo hubo.
+        actualizado:
+          $ref: './common.yaml#/components/schemas/DateTime'
+  responses:
+    SagaConfirmadaNueva:
+      description: Reserva creada y confirmada (`CONFIRMADA`). Los tres pasos quedaron firmes.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ReservaSaga'
+          example:
+            id_reserva: res-3fa85f64b1c2
+            id_pago: pay-res-3fa85f64b1c2
+            id_voucher: voucher-res-3fa85f64b1c2
+            estado: CONFIRMADA
+            error: null
+            actualizado: '2026-11-22T02:17:32.918000+00:00'
+    SagaConfirmadaReintento:
+      description: Reserva `CONFIRMADA` (repeticion idempotente o reconciliacion). Mismo cuerpo que el 201.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ReservaSaga'
+    SagaEnCurso:
+      description: |
+        La Saga no es terminal: en ejecucion o `PENDIENTE_*` (por ejemplo `PENDIENTE_PAGO` tras un timeout de Pagos).
+        NO implica pago aprobado. Consultar `GET /reservas/{id}` o `POST /reservas/{id}/reconciliar`.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ReservaSaga'
+          example:
+            id_reserva: res-3fa85f64b1c2
+            id_pago: pay-res-3fa85f64b1c2
+            id_voucher: voucher-res-3fa85f64b1c2
+            estado: PENDIENTE_PAGO
+            error: Pago sin confirmacion definitiva
+            actualizado: '2026-11-22T02:17:42.996000+00:00'
+    SagaFallidaOConflicto:
+      description: |
+        Dos casos con cuerpos distintos: (a) `ReservaSaga` con `estado: FALLIDA` (la Saga fallo en el paso 1, p. ej.
+        habitacion no disponible; no hay nada que compensar); (b) `Error` con `code: IDEMPOTENCY_CONFLICT`
+        (clave o `id_reserva` reutilizados con otra solicitud).
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/ReservaSaga'
+              - $ref: './common.yaml#/components/schemas/Error'
+    SagaCompensada:
+      description: |
+        La reserva no pudo completarse y todo se revirtio (`COMPENSADA`): pago reembolsado y habitacion liberada.
+        El cuerpo es `ReservaSaga` (no `Error`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ReservaSaga'
+          example:
+            id_reserva: res-3fa85f64b1c2
+            id_pago: pay-res-3fa85f64b1c2
+            id_voucher: voucher-res-3fa85f64b1c2
+            estado: COMPENSADA
+            error: 'Confirmacion: HTTP 500'
+            actualizado: '2026-11-22T02:17:33.249000+00:00'

@@ -1,0 +1,360 @@
+openapi: 3.0.3
+info:
+  title: Servicio Pagos - Contrato API v1
+  version: 1.0.0
+  description: |
+    Cobra y reembolsa la garantia (primera noche) a traves de la pasarela externa (`pasarela.yaml`).
+    Base propia: SQLite (`PAGOS_DB`). **Interno**: no se expone fuera de la red de Docker.
+
+    ## Regla fundamental: el HTTP no decide, el campo `estado` si
+    Los clientes (la Saga) deben decidir segun `estado` del cuerpo, nunca solo segun el codigo HTTP.
+    Nunca se informa `COBRADO` si la pasarela no lo confirmo.
+
+    | `estado`      | Significado                                                                 | HTTP habitual |
+    |---------------|------------------------------------------------------------------------------|---------------|
+    | `COBRADO`     | Confirmado por la pasarela                                                   | 201           |
+    | `RECHAZADO`   | Seguro que NO se cobro (circuito abierto, bulkhead lleno, sin conexion, o `NO_COBRADO`) | 503 + `fallback` |
+    | `INCIERTO`    | Timeout o error ambiguo: podria cobrarse despues. Reconciliar antes de compensar | 202       |
+    | `EN_PROCESO`  | Cobro en curso (llamada anterior aun no termino)                              | 202           |
+    | `REEMBOLSADO` | Reembolso confirmado                                                         | 200           |
+
+    ## Resiliencia (solo sobre el cobro hacia la pasarela)
+    - **Timeout**: `PASARELA_TIMEOUT` (def. 1.0 s). Debe ser menor que `SERVICES_TIMEOUT` de la Saga (def. 2.5 s).
+    - **Circuit Breaker**: `CB_FAILURE_THRESHOLD` (def. 2 fallos consecutivos) y `CB_RECOVERY_SECONDS` (def. 4 s).
+      Estados `CLOSED -> OPEN -> HALF_OPEN -> CLOSED`; en HALF_OPEN pasa una sola llamada de prueba.
+      Abierto: falla en milisegundos con fallback `RECHAZADO` ("Pago no disponible, NO cobrado").
+    - **Bulkhead**: `BULKHEAD_MAX_CONCURRENT` (def. 2) llamadas simultaneas a la pasarela; el exceso se rechaza
+      de inmediato con `RECHAZADO`.
+    - El **reembolso** queda fuera del Circuit Breaker a proposito (para no bloquear compensaciones criticas),
+      pero conserva timeout e idempotencia.
+
+    Idempotencia: la clave es `id_pago`. Misma clave con otro `id_reserva` o `monto` -> 409.
+
+    `x-estado`: `implementado` | `ajustar` | `nuevo`. Ajuste global pendiente: formato de error `Error`
+    (hoy `{"detail": ...}`) y registrar `X-Correlation-ID` en los logs de estado de pago.
+servers:
+  - url: http://pagos:8002
+    description: Red interna de Docker Compose
+  - url: http://127.0.0.1:8002
+    description: Ejecucion local
+tags:
+  - name: Pagos
+  - name: Resiliencia
+  - name: Operacion
+paths:
+  /pagos:
+    post:
+      tags: [Pagos]
+      operationId: pagos_cobrar
+      summary: Cobrar la garantia (paso 2 de la Saga)
+      description: |
+        Si ya existe un pago con el mismo `id_pago` no se vuelve a llamar a la pasarela: se devuelve el
+        registro existente (la repeticion de un pago ya resuelto responde con el mismo cuerpo; si sigue
+        `EN_PROCESO`, responde 202).
+      x-estado: implementado
+      parameters:
+        - $ref: './common.yaml#/components/parameters/XCorrelationID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PagoRequest'
+            example:
+              id_pago: pay-res-3fa85f64b1c2
+              id_reserva: res-3fa85f64b1c2
+              monto: '125.50'
+      responses:
+        '201':
+          description: Cobro confirmado (`COBRADO`). Tambien es lo que devuelve la repeticion de un pago ya resuelto; leer `estado`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pago'
+              example:
+                id_pago: pay-res-3fa85f64b1c2
+                id_reserva: res-3fa85f64b1c2
+                monto_centavos: 12550
+                monto: '125.50'
+                estado: COBRADO
+        '202':
+          description: Resultado no definitivo (`INCIERTO` o `EN_PROCESO`). NO es un pago aprobado; reconciliar.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pago'
+              example:
+                id_pago: pay-res-3fa85f64b1c2
+                id_reserva: res-3fa85f64b1c2
+                monto_centavos: 12550
+                monto: '125.50'
+                estado: INCIERTO
+        '503':
+          description: Fallback seguro. Pago `RECHAZADO`, no se cobro (circuito abierto, bulkhead lleno o pasarela caida).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pago'
+              example:
+                id_pago: pay-res-3fa85f64b1c2
+                id_reserva: res-3fa85f64b1c2
+                monto_centavos: 12550
+                monto: '125.50'
+                estado: RECHAZADO
+                fallback: Pago no disponible, NO cobrado
+        '409':
+          description: '`IDEMPOTENCY_CONFLICT`: `id_pago` reutilizado con otro `id_reserva` o `monto`.'
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+        '422':
+          $ref: './common.yaml#/components/responses/Validacion'
+
+  /pagos/{id_pago}:
+    get:
+      tags: [Pagos]
+      operationId: pagos_obtener
+      summary: Consultar un pago por id
+      x-estado: implementado
+      parameters:
+        - $ref: '#/components/parameters/IdPagoPath'
+        - $ref: './common.yaml#/components/parameters/XCorrelationID'
+      responses:
+        '200':
+          description: Pago encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pago'
+        '404':
+          $ref: './common.yaml#/components/responses/NoEncontrado'
+
+  /pagos/reserva/{id_reserva}:
+    get:
+      tags: [Pagos]
+      operationId: pagos_por_reserva
+      summary: Consultar el pago mas reciente de una reserva
+      x-estado: implementado
+      parameters:
+        - $ref: './common.yaml#/components/parameters/IdReservaPath'
+        - $ref: './common.yaml#/components/parameters/XCorrelationID'
+      responses:
+        '200':
+          description: Pago encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pago'
+        '404':
+          $ref: './common.yaml#/components/responses/NoEncontrado'
+
+  /pagos/{id_pago}/reconciliar:
+    post:
+      tags: [Pagos]
+      operationId: pagos_reconciliar
+      summary: Resolver un pago `INCIERTO`/`EN_PROCESO` consultando a la pasarela
+      description: |
+        Consulta `GET /cobros/{id_pago}` en la pasarela. Si ya figura `COBRADO`/`REEMBOLSADO`, actualiza el estado.
+        Un 404 de la pasarela NO prueba que no se cobrara (un cobro lento podria concretarse despues), asi que
+        el pago sigue incierto. Los estados `RECHAZADO` y `REEMBOLSADO` se devuelven sin consultar.
+      x-estado: implementado
+      parameters:
+        - $ref: '#/components/parameters/IdPagoPath'
+        - $ref: './common.yaml#/components/parameters/XCorrelationID'
+      responses:
+        '200':
+          description: Estado definitivo (`COBRADO`, `RECHAZADO` o `REEMBOLSADO`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pago'
+        '202':
+          description: Sigue sin resolverse (`INCIERTO` o `EN_PROCESO`); reintentar mas tarde.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pago'
+        '404':
+          $ref: './common.yaml#/components/responses/NoEncontrado'
+
+  /pagos/{id_pago}/reembolsar:
+    post:
+      tags: [Pagos]
+      operationId: pagos_reembolsar
+      summary: Reembolsar el pago (compensacion del paso 2)
+      description: |
+        Idempotente: si ya esta `REEMBOLSADO` responde 200 sin nuevos efectos. Solo se reembolsa un pago `COBRADO`;
+        en cualquier otro estado responde 409 (reembolso inseguro).
+      x-estado: ajustar
+      x-ajuste: |
+        Hoy `respuesta.raise_for_status()` lanza `httpx.HTTPStatusError`, que no se captura (solo `RequestError`),
+        y termina en 500. Debe responder 502 `PASARELA_NO_CONFIRMO` cuando la pasarela contesta con error HTTP.
+      parameters:
+        - $ref: '#/components/parameters/IdPagoPath'
+        - $ref: './common.yaml#/components/parameters/XCorrelationID'
+      responses:
+        '200':
+          description: Reembolso confirmado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pago'
+        '404':
+          $ref: './common.yaml#/components/responses/NoEncontrado'
+        '409':
+          description: '`REEMBOLSO_INSEGURO`: el pago no esta `COBRADO` (por ejemplo `INCIERTO`).'
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+        '502':
+          description: '`PASARELA_NO_CONFIRMO`: la pasarela respondio con error o sin confirmar el reembolso.'
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+        '503':
+          description: '`REEMBOLSO_PENDIENTE`: no se pudo contactar a la pasarela (timeout o conexion). Reintentar la compensacion.'
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+
+  /metricas:
+    get:
+      tags: [Resiliencia]
+      operationId: pagos_metricas
+      summary: Metricas de Circuit Breaker y Bulkhead
+      description: Contadores en memoria; evidencia para el escenario 3. Solo red interna.
+      x-estado: implementado
+      responses:
+        '200':
+          description: Instantanea de metricas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Metricas'
+              example:
+                circuit_breaker: OPEN
+                fallos_consecutivos: 2
+                bulkhead_en_uso: 0
+                bulkhead_capacidad: 2
+                umbral: 2
+                llamadas_pasarela: 2
+                exitos: 0
+                fallos: 2
+                timeouts: 2
+                rechazos_circuito: 1
+                rechazos_bulkhead: 10
+                fallbacks: 11
+                transiciones_open: 1
+
+  /demo/reset-resiliencia:
+    post:
+      tags: [Resiliencia]
+      operationId: pagos_reset_resiliencia
+      summary: Reiniciar Circuit Breaker, Bulkhead y contadores (solo demo/pruebas)
+      x-estado: implementado
+      responses:
+        '200':
+          description: Reiniciado; devuelve la instantanea de metricas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Metricas'
+        '409':
+          description: '`RESET_NO_PERMITIDO`: hay solicitudes en vuelo.'
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+
+  /health:
+    get:
+      tags: [Operacion]
+      operationId: pagos_health
+      summary: Healthcheck
+      x-estado: implementado
+      responses:
+        '200':
+          description: Servicio operativo.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Health'
+
+components:
+  parameters:
+    IdPagoPath:
+      name: id_pago
+      in: path
+      required: true
+      schema:
+        $ref: './common.yaml#/components/schemas/IdPago'
+  schemas:
+    PagoRequest:
+      type: object
+      required: [id_pago, id_reserva, monto]
+      properties:
+        id_pago:
+          $ref: './common.yaml#/components/schemas/IdPago'
+        id_reserva:
+          $ref: './common.yaml#/components/schemas/IdReserva'
+        monto:
+          $ref: './common.yaml#/components/schemas/Monto'
+    Pago:
+      type: object
+      required: [id_pago, id_reserva, monto_centavos, monto, estado]
+      properties:
+        id_pago:
+          $ref: './common.yaml#/components/schemas/IdPago'
+        id_reserva:
+          $ref: './common.yaml#/components/schemas/IdReserva'
+        monto_centavos:
+          type: integer
+          minimum: 1
+          description: Monto en centavos (entero); es lo que se persiste y se envia a la pasarela.
+        monto:
+          $ref: './common.yaml#/components/schemas/Monto'
+        estado:
+          $ref: './common.yaml#/components/schemas/EstadoPago'
+        fallback:
+          type: string
+          description: Presente solo cuando se aplico el fallback.
+          example: Pago no disponible, NO cobrado
+        mensaje:
+          type: string
+          description: Presente al repetir una solicitud mientras el cobro sigue en curso.
+    Metricas:
+      type: object
+      required:
+        - circuit_breaker
+        - fallos_consecutivos
+        - bulkhead_en_uso
+        - bulkhead_capacidad
+        - umbral
+        - llamadas_pasarela
+        - exitos
+        - fallos
+        - timeouts
+        - rechazos_circuito
+        - rechazos_bulkhead
+        - fallbacks
+        - transiciones_open
+      properties:
+        circuit_breaker:
+          type: string
+          enum: [CLOSED, OPEN, HALF_OPEN]
+        fallos_consecutivos: {type: integer}
+        bulkhead_en_uso: {type: integer, description: Llamadas a la pasarela en vuelo ahora.}
+        bulkhead_capacidad: {type: integer}
+        umbral: {type: integer}
+        llamadas_pasarela: {type: integer, description: Llamadas que efectivamente llegaron a la pasarela.}
+        exitos: {type: integer}
+        fallos: {type: integer}
+        timeouts: {type: integer}
+        rechazos_circuito: {type: integer, description: Rechazadas por circuito OPEN/HALF_OPEN (fail-fast).}
+        rechazos_bulkhead: {type: integer, description: Rechazadas por Bulkhead lleno.}
+        fallbacks: {type: integer}
+        transiciones_open: {type: integer}

@@ -6,6 +6,7 @@ Responsabilidades:
 - Idempotencia: Si llega el mismo id, no duplica
 """
 
+import os
 import sqlite3
 from datetime import date
 from contextlib import contextmanager
@@ -13,7 +14,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, model_validator
 
 app = FastAPI(title="Servicio-Habitaciones")
-DB_NAME = "habitaciones.db"
+DB_NAME = os.getenv("HABITACIONES_DB", "habitaciones.db")
 
 @contextmanager
 def get_db(immediate: bool = True):
@@ -89,6 +90,8 @@ def reservar(req: ReservaRequest):
                 or existente["fecha_fin"] != fin_str
             ):
                 raise HTTPException(status_code=409, detail="Idempotency Key en uso con datos distintos")
+            if existente["estado"] != "RESERVADA":
+                raise HTTPException(status_code=409, detail="La reserva ya fue liberada y no puede reactivarse")
             return dict(existente)
 
         # Verificar fechas solapadas
@@ -156,3 +159,18 @@ def obtener_reserva(id_reserva: str):
             raise HTTPException(status_code=404, detail="Reserva no encontrada")
 
         return dict(reserva)
+
+@app.get("/disponibilidad")
+def disponibilidad(habitacion_id: int, fecha_inicio: date, fecha_fin: date):
+    if fecha_inicio >= fecha_fin:
+        raise HTTPException(status_code=422, detail="Intervalo de fechas invalido")
+    with get_db(immediate=False) as conn:
+        ocupado = conn.execute("""
+            SELECT 1 FROM reservas WHERE habitacion_id = ? AND estado = 'RESERVADA'
+            AND fecha_inicio < ? AND fecha_fin > ? LIMIT 1
+        """, (habitacion_id, fecha_fin.isoformat(), fecha_inicio.isoformat())).fetchone()
+    return {"habitacion_id": habitacion_id, "disponible": not bool(ocupado)}
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}

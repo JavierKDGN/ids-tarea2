@@ -1,0 +1,152 @@
+INFO:     Started server process [22719]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8004 (Press CTRL+C to quit)
+INFO:     Started server process [22723]
+INFO:     Waiting for application startup.
+INFO:     Started server process [22722]
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8003 (Press CTRL+C to quit)
+INFO:     Started server process [22721]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8002 (Press CTRL+C to quit)
+INFO:     Started server process [22720]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8001 (Press CTRL+C to quit)
+
+Servicios disponibles:
+  Saga: http://127.0.0.1:8000/docs
+  Habitaciones: http://127.0.0.1:8001/docs
+  Pagos: http://127.0.0.1:8002/docs
+  Confirmaciones: http://127.0.0.1:8003/docs
+  Pasarela: http://127.0.0.1:8004/docs
+
+Ejecuta en otra terminal: python scripts/experimentos.py
+2026-11-22 02:17:32,730 INFO pasarela evento=chaos configuracion={'latencia_segundos': 0.0, 'forzar_error': False}
+2026-11-22 02:17:32,815 INFO httpx HTTP Request: POST http://127.0.0.1:8001/reservas "HTTP/1.1 201 Created"
+2026-11-22 02:17:32,820 INFO saga evento=estado_saga reserva=feliz-efc8f8b2 estado=HABITACION_RESERVADA error=None
+2026-11-22 02:17:32,892 INFO pasarela evento=cobro_realizado pago=pay-feliz-efc8f8b2 reserva=feliz-efc8f8b2 corr=feliz-efc8f8b2
+2026-11-22 02:17:32,894 INFO httpx HTTP Request: POST http://127.0.0.1:8004/cobros "HTTP/1.1 201 Created"
+2026-11-22 02:17:32,897 INFO pagos evento=estado_pago pago=pay-feliz-efc8f8b2 estado=COBRADO
+2026-11-22 02:17:32,899 INFO httpx HTTP Request: POST http://127.0.0.1:8002/pagos "HTTP/1.1 201 Created"
+2026-11-22 02:17:32,904 INFO saga evento=estado_saga reserva=feliz-efc8f8b2 estado=PAGO_COBRADO error=None
+2026-11-22 02:17:32,906 INFO httpx HTTP Request: GET http://127.0.0.1:8002/pagos/pay-feliz-efc8f8b2 "HTTP/1.1 200 OK"
+2026-11-22 02:17:32,914 INFO httpx HTTP Request: POST http://127.0.0.1:8003/confirmaciones "HTTP/1.1 201 Created"
+2026-11-22 02:17:32,918 INFO saga evento=estado_saga reserva=feliz-efc8f8b2 estado=CONFIRMADA error=None
+2026-11-22 02:17:33,111 INFO httpx HTTP Request: POST http://127.0.0.1:8001/reservas "HTTP/1.1 201 Created"
+2026-11-22 02:17:33,115 INFO saga evento=estado_saga reserva=comp-efc8f8b2 estado=HABITACION_RESERVADA error=None
+2026-11-22 02:17:33,173 INFO pasarela evento=cobro_realizado pago=pay-comp-efc8f8b2 reserva=comp-efc8f8b2 corr=comp-efc8f8b2
+2026-11-22 02:17:33,174 INFO httpx HTTP Request: POST http://127.0.0.1:8004/cobros "HTTP/1.1 201 Created"
+2026-11-22 02:17:33,179 INFO pagos evento=estado_pago pago=pay-comp-efc8f8b2 estado=COBRADO
+2026-11-22 02:17:33,181 INFO httpx HTTP Request: POST http://127.0.0.1:8002/pagos "HTTP/1.1 201 Created"
+2026-11-22 02:17:33,185 INFO saga evento=estado_saga reserva=comp-efc8f8b2 estado=PAGO_COBRADO error=None
+2026-11-22 02:17:33,188 INFO httpx HTTP Request: GET http://127.0.0.1:8002/pagos/pay-comp-efc8f8b2 "HTTP/1.1 200 OK"
+2026-11-22 02:17:33,191 INFO httpx HTTP Request: POST http://127.0.0.1:8003/confirmaciones "HTTP/1.1 500 Internal Server Error"
+2026-11-22 02:17:33,195 INFO saga evento=estado_saga reserva=comp-efc8f8b2 estado=COMPENSANDO error=Confirmacion: HTTP 500
+2026-11-22 02:17:33,198 INFO httpx HTTP Request: GET http://127.0.0.1:8003/confirmaciones/voucher-comp-efc8f8b2 "HTTP/1.1 404 Not Found"
+2026-11-22 02:17:33,201 INFO httpx HTTP Request: GET http://127.0.0.1:8002/pagos/pay-comp-efc8f8b2 "HTTP/1.1 200 OK"
+2026-11-22 02:17:33,228 INFO pasarela evento=reembolso_realizado pago=pay-comp-efc8f8b2 corr=comp-efc8f8b2
+2026-11-22 02:17:33,229 INFO httpx HTTP Request: POST http://127.0.0.1:8004/cobros/pay-comp-efc8f8b2/reembolsar "HTTP/1.1 200 OK"
+2026-11-22 02:17:33,233 INFO pagos evento=estado_pago pago=pay-comp-efc8f8b2 estado=REEMBOLSADO
+2026-11-22 02:17:33,234 INFO httpx HTTP Request: POST http://127.0.0.1:8002/pagos/pay-comp-efc8f8b2/reembolsar "HTTP/1.1 200 OK"
+2026-11-22 02:17:33,234 INFO saga evento=compensacion paso=reembolsar reserva=comp-efc8f8b2
+2026-11-22 02:17:33,237 INFO httpx HTTP Request: GET http://127.0.0.1:8001/reservas/comp-efc8f8b2 "HTTP/1.1 200 OK"
+2026-11-22 02:17:33,245 INFO httpx HTTP Request: POST http://127.0.0.1:8001/reservas/comp-efc8f8b2/liberar "HTTP/1.1 200 OK"
+2026-11-22 02:17:33,245 INFO saga evento=compensacion paso=liberar_habitacion reserva=comp-efc8f8b2
+2026-11-22 02:17:33,249 INFO saga evento=estado_saga reserva=comp-efc8f8b2 estado=COMPENSADA error=Confirmacion: HTTP 500
+2026-11-22 02:17:33,391 INFO pasarela evento=chaos configuracion={'latencia_segundos': 2.0, 'forzar_error': False}
+2026-11-22 02:17:33,583 WARNING pagos.resiliencia evento=bulkhead_rechazo capacidad=2
+2026-11-22 02:17:33,583 WARNING pagos evento=fallback pago=pay-carga-efc8f8b2-10 motivo=Bulkhead lleno: concurrencia aislada
+2026-11-22 02:17:33,586 WARNING pagos.resiliencia evento=bulkhead_rechazo capacidad=2
+2026-11-22 02:17:33,586 WARNING pagos evento=fallback pago=pay-carga-efc8f8b2-3 motivo=Bulkhead lleno: concurrencia aislada
+2026-11-22 02:17:33,589 INFO pagos evento=estado_pago pago=pay-carga-efc8f8b2-10 estado=RECHAZADO
+2026-11-22 02:17:33,594 INFO pagos evento=estado_pago pago=pay-carga-efc8f8b2-3 estado=RECHAZADO
+2026-11-22 02:17:33,600 WARNING pagos.resiliencia evento=bulkhead_rechazo capacidad=2
+2026-11-22 02:17:33,600 WARNING pagos evento=fallback pago=pay-carga-efc8f8b2-2 motivo=Bulkhead lleno: concurrencia aislada
+2026-11-22 02:17:33,603 INFO pagos evento=estado_pago pago=pay-carga-efc8f8b2-2 estado=RECHAZADO
+2026-11-22 02:17:33,607 WARNING pagos.resiliencia evento=bulkhead_rechazo capacidad=2
+2026-11-22 02:17:33,607 WARNING pagos evento=fallback pago=pay-carga-efc8f8b2-1 motivo=Bulkhead lleno: concurrencia aislada
+2026-11-22 02:17:33,611 INFO pagos evento=estado_pago pago=pay-carga-efc8f8b2-1 estado=RECHAZADO
+2026-11-22 02:17:33,617 WARNING pagos.resiliencia evento=bulkhead_rechazo capacidad=2
+2026-11-22 02:17:33,617 WARNING pagos evento=fallback pago=pay-carga-efc8f8b2-8 motivo=Bulkhead lleno: concurrencia aislada
+2026-11-22 02:17:33,620 INFO pagos evento=estado_pago pago=pay-carga-efc8f8b2-8 estado=RECHAZADO
+2026-11-22 02:17:33,630 WARNING pagos.resiliencia evento=bulkhead_rechazo capacidad=2
+2026-11-22 02:17:33,630 WARNING pagos evento=fallback pago=pay-carga-efc8f8b2-0 motivo=Bulkhead lleno: concurrencia aislada
+2026-11-22 02:17:33,633 INFO pagos evento=estado_pago pago=pay-carga-efc8f8b2-0 estado=RECHAZADO
+2026-11-22 02:17:33,637 WARNING pagos.resiliencia evento=bulkhead_rechazo capacidad=2
+2026-11-22 02:17:33,638 WARNING pagos evento=fallback pago=pay-carga-efc8f8b2-6 motivo=Bulkhead lleno: concurrencia aislada
+2026-11-22 02:17:33,641 INFO pagos evento=estado_pago pago=pay-carga-efc8f8b2-6 estado=RECHAZADO
+2026-11-22 02:17:33,664 WARNING pagos.resiliencia evento=bulkhead_rechazo capacidad=2
+2026-11-22 02:17:33,664 WARNING pagos evento=fallback pago=pay-carga-efc8f8b2-9 motivo=Bulkhead lleno: concurrencia aislada
+2026-11-22 02:17:33,668 INFO pagos evento=estado_pago pago=pay-carga-efc8f8b2-9 estado=RECHAZADO
+2026-11-22 02:17:33,689 WARNING pagos.resiliencia evento=bulkhead_rechazo capacidad=2
+2026-11-22 02:17:33,689 WARNING pagos evento=fallback pago=pay-carga-efc8f8b2-11 motivo=Bulkhead lleno: concurrencia aislada
+2026-11-22 02:17:33,692 INFO pagos evento=estado_pago pago=pay-carga-efc8f8b2-11 estado=RECHAZADO
+2026-11-22 02:17:33,714 WARNING pagos.resiliencia evento=bulkhead_rechazo capacidad=2
+2026-11-22 02:17:33,715 WARNING pagos evento=fallback pago=pay-carga-efc8f8b2-7 motivo=Bulkhead lleno: concurrencia aislada
+2026-11-22 02:17:33,719 INFO pagos evento=estado_pago pago=pay-carga-efc8f8b2-7 estado=RECHAZADO
+2026-11-22 02:17:34,579 WARNING pagos evento=pago_incierto pago=pay-carga-efc8f8b2-4 motivo=timed out
+2026-11-22 02:17:34,584 INFO pagos evento=estado_pago pago=pay-carga-efc8f8b2-4 estado=INCIERTO
+2026-11-22 02:17:34,597 WARNING pagos.resiliencia evento=circuit_breaker estado=OPEN fallos=2
+2026-11-22 02:17:34,598 WARNING pagos evento=pago_incierto pago=pay-carga-efc8f8b2-5 motivo=timed out
+2026-11-22 02:17:34,603 INFO pagos evento=estado_pago pago=pay-carga-efc8f8b2-5 estado=INCIERTO
+2026-11-22 02:17:34,631 WARNING pagos evento=fallback pago=pay-carga-efc8f8b2-100 motivo=Circuit Breaker OPEN: fallo rapido
+2026-11-22 02:17:34,635 INFO pagos evento=estado_pago pago=pay-carga-efc8f8b2-100 estado=RECHAZADO
+2026-11-22 02:17:35,584 INFO pasarela evento=cobro_realizado pago=pay-carga-efc8f8b2-4 reserva=carga-efc8f8b2-4 corr=carga-efc8f8b2-4
+2026-11-22 02:17:35,602 INFO pasarela evento=cobro_realizado pago=pay-carga-efc8f8b2-5 reserva=carga-efc8f8b2-5 corr=carga-efc8f8b2-5
+2026-11-22 02:17:37,064 INFO httpx HTTP Request: GET http://127.0.0.1:8004/cobros/pay-carga-efc8f8b2-4 "HTTP/1.1 200 OK"
+2026-11-22 02:17:37,068 INFO pagos evento=estado_pago pago=pay-carga-efc8f8b2-4 estado=COBRADO
+2026-11-22 02:17:37,119 INFO pasarela evento=reembolso_realizado pago=pay-carga-efc8f8b2-4 corr=carga-efc8f8b2-4
+2026-11-22 02:17:37,119 INFO httpx HTTP Request: POST http://127.0.0.1:8004/cobros/pay-carga-efc8f8b2-4/reembolsar "HTTP/1.1 200 OK"
+2026-11-22 02:17:37,123 INFO pagos evento=estado_pago pago=pay-carga-efc8f8b2-4 estado=REEMBOLSADO
+2026-11-22 02:17:37,176 INFO httpx HTTP Request: GET http://127.0.0.1:8004/cobros/pay-carga-efc8f8b2-5 "HTTP/1.1 200 OK"
+2026-11-22 02:17:37,180 INFO pagos evento=estado_pago pago=pay-carga-efc8f8b2-5 estado=COBRADO
+2026-11-22 02:17:37,225 INFO pasarela evento=reembolso_realizado pago=pay-carga-efc8f8b2-5 corr=carga-efc8f8b2-5
+2026-11-22 02:17:37,226 INFO httpx HTTP Request: POST http://127.0.0.1:8004/cobros/pay-carga-efc8f8b2-5/reembolsar "HTTP/1.1 200 OK"
+2026-11-22 02:17:37,229 INFO pagos evento=estado_pago pago=pay-carga-efc8f8b2-5 estado=REEMBOLSADO
+2026-11-22 02:17:37,362 INFO pasarela evento=chaos configuracion={'latencia_segundos': 0.0, 'forzar_error': True}
+2026-11-22 02:17:37,423 WARNING pasarela evento=pasarela_caida pago=pay-caida-efc8f8b2-0 corr=caida-efc8f8b2-0
+2026-11-22 02:17:37,424 INFO httpx HTTP Request: POST http://127.0.0.1:8004/cobros "HTTP/1.1 503 Service Unavailable"
+2026-11-22 02:17:37,428 INFO pagos evento=estado_pago pago=pay-caida-efc8f8b2-0 estado=RECHAZADO
+2026-11-22 02:17:37,471 WARNING pasarela evento=pasarela_caida pago=pay-caida-efc8f8b2-1 corr=caida-efc8f8b2-1
+2026-11-22 02:17:37,472 INFO httpx HTTP Request: POST http://127.0.0.1:8004/cobros "HTTP/1.1 503 Service Unavailable"
+2026-11-22 02:17:37,472 WARNING pagos.resiliencia evento=circuit_breaker estado=OPEN fallos=2
+2026-11-22 02:17:37,475 INFO pagos evento=estado_pago pago=pay-caida-efc8f8b2-1 estado=RECHAZADO
+2026-11-22 02:17:37,510 WARNING pagos evento=fallback pago=pay-caida-efc8f8b2-2 motivo=Circuit Breaker OPEN: fallo rapido
+2026-11-22 02:17:37,514 INFO pagos evento=estado_pago pago=pay-caida-efc8f8b2-2 estado=RECHAZADO
+2026-11-22 02:17:37,553 INFO pasarela evento=chaos configuracion={'latencia_segundos': 0.0, 'forzar_error': False}
+2026-11-22 02:17:41,778 WARNING pagos.resiliencia evento=circuit_breaker estado=HALF_OPEN
+2026-11-22 02:17:41,818 INFO pasarela evento=cobro_realizado pago=pay-recuperacion-efc8f8b2-1 reserva=recuperacion-efc8f8b2-1 corr=recuperacion-efc8f8b2-1
+2026-11-22 02:17:41,819 INFO httpx HTTP Request: POST http://127.0.0.1:8004/cobros "HTTP/1.1 201 Created"
+2026-11-22 02:17:41,819 INFO pagos.resiliencia evento=circuit_breaker estado=CLOSED
+2026-11-22 02:17:41,823 INFO pagos evento=estado_pago pago=pay-recuperacion-efc8f8b2-1 estado=COBRADO
+2026-11-22 02:17:41,862 INFO pasarela evento=chaos configuracion={'latencia_segundos': 2.0, 'forzar_error': False}
+2026-11-22 02:17:41,929 INFO httpx HTTP Request: POST http://127.0.0.1:8001/reservas "HTTP/1.1 201 Created"
+2026-11-22 02:17:41,934 INFO saga evento=estado_saga reserva=tarde-efc8f8b2 estado=HABITACION_RESERVADA error=None
+2026-11-22 02:17:42,985 WARNING pagos evento=pago_incierto pago=pay-tarde-efc8f8b2 motivo=timed out
+2026-11-22 02:17:42,990 INFO pagos evento=estado_pago pago=pay-tarde-efc8f8b2 estado=INCIERTO
+2026-11-22 02:17:42,991 INFO httpx HTTP Request: POST http://127.0.0.1:8002/pagos "HTTP/1.1 202 Accepted"
+2026-11-22 02:17:42,996 INFO saga evento=estado_saga reserva=tarde-efc8f8b2 estado=PENDIENTE_PAGO error=Pago sin confirmacion definitiva
+2026-11-22 02:17:43,989 INFO pasarela evento=cobro_realizado pago=pay-tarde-efc8f8b2 reserva=tarde-efc8f8b2 corr=tarde-efc8f8b2
+2026-11-22 02:17:45,320 INFO httpx HTTP Request: GET http://127.0.0.1:8004/cobros/pay-tarde-efc8f8b2 "HTTP/1.1 200 OK"
+2026-11-22 02:17:45,325 INFO pagos evento=estado_pago pago=pay-tarde-efc8f8b2 estado=COBRADO
+2026-11-22 02:17:45,326 INFO httpx HTTP Request: POST http://127.0.0.1:8002/pagos/pay-tarde-efc8f8b2/reconciliar "HTTP/1.1 200 OK"
+2026-11-22 02:17:45,331 INFO saga evento=estado_saga reserva=tarde-efc8f8b2 estado=COMPENSANDO error=Pago resuelto despues de respuesta incierta
+2026-11-22 02:17:45,334 INFO httpx HTTP Request: GET http://127.0.0.1:8003/confirmaciones/voucher-tarde-efc8f8b2 "HTTP/1.1 404 Not Found"
+2026-11-22 02:17:45,336 INFO httpx HTTP Request: GET http://127.0.0.1:8002/pagos/pay-tarde-efc8f8b2 "HTTP/1.1 200 OK"
+2026-11-22 02:17:45,362 INFO pasarela evento=reembolso_realizado pago=pay-tarde-efc8f8b2 corr=tarde-efc8f8b2
+2026-11-22 02:17:45,363 INFO httpx HTTP Request: POST http://127.0.0.1:8004/cobros/pay-tarde-efc8f8b2/reembolsar "HTTP/1.1 200 OK"
+2026-11-22 02:17:45,367 INFO pagos evento=estado_pago pago=pay-tarde-efc8f8b2 estado=REEMBOLSADO
+2026-11-22 02:17:45,368 INFO httpx HTTP Request: POST http://127.0.0.1:8002/pagos/pay-tarde-efc8f8b2/reembolsar "HTTP/1.1 200 OK"
+2026-11-22 02:17:45,369 INFO saga evento=compensacion paso=reembolsar reserva=tarde-efc8f8b2
+2026-11-22 02:17:45,372 INFO httpx HTTP Request: GET http://127.0.0.1:8001/reservas/tarde-efc8f8b2 "HTTP/1.1 200 OK"
+2026-11-22 02:17:45,379 INFO httpx HTTP Request: POST http://127.0.0.1:8001/reservas/tarde-efc8f8b2/liberar "HTTP/1.1 200 OK"
+2026-11-22 02:17:45,379 INFO saga evento=compensacion paso=liberar_habitacion reserva=tarde-efc8f8b2
+2026-11-22 02:17:45,383 INFO saga evento=estado_saga reserva=tarde-efc8f8b2 estado=COMPENSADA error=Pago resuelto despues de respuesta incierta
+2026-11-22 02:17:45,487 INFO pasarela evento=chaos configuracion={'latencia_segundos': 0.0, 'forzar_error': False}
+2026-11-22 02:17:45,558 INFO pasarela evento=chaos configuracion={'latencia_segundos': 0.0, 'forzar_error': False}
