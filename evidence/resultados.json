@@ -1,0 +1,557 @@
+{
+  "camino_feliz": {
+    "respuesta": {
+      "http": 201,
+      "datos": {
+        "id_reserva": "feliz-efc8f8b2",
+        "id_pago": "pay-feliz-efc8f8b2",
+        "id_voucher": "voucher-feliz-efc8f8b2",
+        "estado": "CONFIRMADA",
+        "error": null,
+        "actualizado": "2026-11-22T05:17:32.914918+00:00"
+      }
+    },
+    "habitacion": {
+      "http": 200,
+      "datos": {
+        "id_reserva": "feliz-efc8f8b2",
+        "habitacion_id": 4022935490,
+        "fecha_inicio": "2027-01-10",
+        "fecha_fin": "2027-01-13",
+        "estado": "RESERVADA"
+      }
+    },
+    "pago": {
+      "http": 200,
+      "datos": {
+        "id_pago": "pay-feliz-efc8f8b2",
+        "id_reserva": "feliz-efc8f8b2",
+        "monto_centavos": 8000,
+        "estado": "COBRADO",
+        "monto": "80.00"
+      }
+    },
+    "confirmacion": {
+      "http": 200,
+      "datos": {
+        "id_voucher": "voucher-feliz-efc8f8b2",
+        "id_reserva": "feliz-efc8f8b2",
+        "estado": "EMITIDO",
+        "fecha_emision": "2026-11-22T05:17:32.909572+00:00"
+      }
+    },
+    "reintento_idempotente": {
+      "http": 200,
+      "datos": {
+        "id_reserva": "feliz-efc8f8b2",
+        "id_pago": "pay-feliz-efc8f8b2",
+        "id_voucher": "voucher-feliz-efc8f8b2",
+        "estado": "CONFIRMADA",
+        "error": null,
+        "actualizado": "2026-11-22T05:17:32.914918+00:00"
+      }
+    }
+  },
+  "compensacion": {
+    "respuesta": {
+      "http": 502,
+      "datos": {
+        "id_reserva": "comp-efc8f8b2",
+        "id_pago": "pay-comp-efc8f8b2",
+        "id_voucher": "voucher-comp-efc8f8b2",
+        "estado": "COMPENSADA",
+        "error": "Confirmacion: HTTP 500",
+        "actualizado": "2026-11-22T05:17:33.246119+00:00"
+      }
+    },
+    "habitacion": {
+      "http": 200,
+      "datos": {
+        "id_reserva": "comp-efc8f8b2",
+        "habitacion_id": 4022935491,
+        "fecha_inicio": "2027-01-10",
+        "fecha_fin": "2027-01-13",
+        "estado": "LIBERADA"
+      }
+    },
+    "pago": {
+      "http": 200,
+      "datos": {
+        "id_pago": "pay-comp-efc8f8b2",
+        "id_reserva": "comp-efc8f8b2",
+        "monto_centavos": 8000,
+        "estado": "REEMBOLSADO",
+        "monto": "80.00"
+      }
+    },
+    "confirmacion": {
+      "http": 404,
+      "datos": {
+        "detail": "voucher no encontrado"
+      }
+    }
+  },
+  "lentitud_bulkhead": {
+    "peticiones": [
+      {
+        "id_pago": "pay-carga-efc8f8b2-0",
+        "duracion_s": 0.24,
+        "http": 503,
+        "datos": {
+          "id_pago": "pay-carga-efc8f8b2-0",
+          "id_reserva": "carga-efc8f8b2-0",
+          "monto_centavos": 8000,
+          "estado": "RECHAZADO",
+          "monto": "80.00",
+          "fallback": "Pago no disponible, NO cobrado"
+        }
+      },
+      {
+        "id_pago": "pay-carga-efc8f8b2-1",
+        "duracion_s": 0.218,
+        "http": 503,
+        "datos": {
+          "id_pago": "pay-carga-efc8f8b2-1",
+          "id_reserva": "carga-efc8f8b2-1",
+          "monto_centavos": 8000,
+          "estado": "RECHAZADO",
+          "monto": "80.00",
+          "fallback": "Pago no disponible, NO cobrado"
+        }
+      },
+      {
+        "id_pago": "pay-carga-efc8f8b2-2",
+        "duracion_s": 0.21,
+        "http": 503,
+        "datos": {
+          "id_pago": "pay-carga-efc8f8b2-2",
+          "id_reserva": "carga-efc8f8b2-2",
+          "monto_centavos": 8000,
+          "estado": "RECHAZADO",
+          "monto": "80.00",
+          "fallback": "Pago no disponible, NO cobrado"
+        }
+      },
+      {
+        "id_pago": "pay-carga-efc8f8b2-3",
+        "duracion_s": 0.201,
+        "http": 503,
+        "datos": {
+          "id_pago": "pay-carga-efc8f8b2-3",
+          "id_reserva": "carga-efc8f8b2-3",
+          "monto_centavos": 8000,
+          "estado": "RECHAZADO",
+          "monto": "80.00",
+          "fallback": "Pago no disponible, NO cobrado"
+        }
+      },
+      {
+        "id_pago": "pay-carga-efc8f8b2-4",
+        "duracion_s": 1.189,
+        "http": 202,
+        "datos": {
+          "id_pago": "pay-carga-efc8f8b2-4",
+          "id_reserva": "carga-efc8f8b2-4",
+          "monto_centavos": 8000,
+          "estado": "INCIERTO",
+          "monto": "80.00"
+        }
+      },
+      {
+        "id_pago": "pay-carga-efc8f8b2-5",
+        "duracion_s": 1.207,
+        "http": 202,
+        "datos": {
+          "id_pago": "pay-carga-efc8f8b2-5",
+          "id_reserva": "carga-efc8f8b2-5",
+          "monto_centavos": 8000,
+          "estado": "INCIERTO",
+          "monto": "80.00"
+        }
+      },
+      {
+        "id_pago": "pay-carga-efc8f8b2-6",
+        "duracion_s": 0.239,
+        "http": 503,
+        "datos": {
+          "id_pago": "pay-carga-efc8f8b2-6",
+          "id_reserva": "carga-efc8f8b2-6",
+          "monto_centavos": 8000,
+          "estado": "RECHAZADO",
+          "monto": "80.00",
+          "fallback": "Pago no disponible, NO cobrado"
+        }
+      },
+      {
+        "id_pago": "pay-carga-efc8f8b2-7",
+        "duracion_s": 0.317,
+        "http": 503,
+        "datos": {
+          "id_pago": "pay-carga-efc8f8b2-7",
+          "id_reserva": "carga-efc8f8b2-7",
+          "monto_centavos": 8000,
+          "estado": "RECHAZADO",
+          "monto": "80.00",
+          "fallback": "Pago no disponible, NO cobrado"
+        }
+      },
+      {
+        "id_pago": "pay-carga-efc8f8b2-8",
+        "duracion_s": 0.215,
+        "http": 503,
+        "datos": {
+          "id_pago": "pay-carga-efc8f8b2-8",
+          "id_reserva": "carga-efc8f8b2-8",
+          "monto_centavos": 8000,
+          "estado": "RECHAZADO",
+          "monto": "80.00",
+          "fallback": "Pago no disponible, NO cobrado"
+        }
+      },
+      {
+        "id_pago": "pay-carga-efc8f8b2-9",
+        "duracion_s": 0.262,
+        "http": 503,
+        "datos": {
+          "id_pago": "pay-carga-efc8f8b2-9",
+          "id_reserva": "carga-efc8f8b2-9",
+          "monto_centavos": 8000,
+          "estado": "RECHAZADO",
+          "monto": "80.00",
+          "fallback": "Pago no disponible, NO cobrado"
+        }
+      },
+      {
+        "id_pago": "pay-carga-efc8f8b2-10",
+        "duracion_s": 0.217,
+        "http": 503,
+        "datos": {
+          "id_pago": "pay-carga-efc8f8b2-10",
+          "id_reserva": "carga-efc8f8b2-10",
+          "monto_centavos": 8000,
+          "estado": "RECHAZADO",
+          "monto": "80.00",
+          "fallback": "Pago no disponible, NO cobrado"
+        }
+      },
+      {
+        "id_pago": "pay-carga-efc8f8b2-11",
+        "duracion_s": 0.284,
+        "http": 503,
+        "datos": {
+          "id_pago": "pay-carga-efc8f8b2-11",
+          "id_reserva": "carga-efc8f8b2-11",
+          "monto_centavos": 8000,
+          "estado": "RECHAZADO",
+          "monto": "80.00",
+          "fallback": "Pago no disponible, NO cobrado"
+        }
+      }
+    ],
+    "rechazo_rapido": {
+      "id_pago": "pay-carga-efc8f8b2-100",
+      "duracion_s": 0.029,
+      "http": 503,
+      "datos": {
+        "id_pago": "pay-carga-efc8f8b2-100",
+        "id_reserva": "carga-efc8f8b2-100",
+        "monto_centavos": 8000,
+        "estado": "RECHAZADO",
+        "monto": "80.00",
+        "fallback": "Pago no disponible, NO cobrado"
+      }
+    },
+    "latencia_failfast_s": 0.029,
+    "metricas": {
+      "http": 200,
+      "datos": {
+        "circuit_breaker": "OPEN",
+        "fallos_consecutivos": 2,
+        "bulkhead_en_uso": 0,
+        "bulkhead_capacidad": 2,
+        "umbral": 2,
+        "llamadas_pasarela": 2,
+        "exitos": 0,
+        "fallos": 2,
+        "timeouts": 2,
+        "rechazos_circuito": 1,
+        "rechazos_bulkhead": 10,
+        "fallbacks": 11,
+        "transiciones_open": 1
+      }
+    },
+    "servicios_sanos": {
+      "habitaciones": {
+        "http": 200,
+        "datos": {
+          "status": "ok"
+        }
+      },
+      "confirmaciones": {
+        "http": 200,
+        "datos": {
+          "status": "ok"
+        }
+      }
+    },
+    "limpieza_pagos": [
+      {
+        "http": 200,
+        "datos": {
+          "id_pago": "pay-carga-efc8f8b2-0",
+          "id_reserva": "carga-efc8f8b2-0",
+          "monto_centavos": 8000,
+          "estado": "RECHAZADO",
+          "monto": "80.00"
+        }
+      },
+      {
+        "http": 200,
+        "datos": {
+          "id_pago": "pay-carga-efc8f8b2-1",
+          "id_reserva": "carga-efc8f8b2-1",
+          "monto_centavos": 8000,
+          "estado": "RECHAZADO",
+          "monto": "80.00"
+        }
+      },
+      {
+        "http": 200,
+        "datos": {
+          "id_pago": "pay-carga-efc8f8b2-2",
+          "id_reserva": "carga-efc8f8b2-2",
+          "monto_centavos": 8000,
+          "estado": "RECHAZADO",
+          "monto": "80.00"
+        }
+      },
+      {
+        "http": 200,
+        "datos": {
+          "id_pago": "pay-carga-efc8f8b2-3",
+          "id_reserva": "carga-efc8f8b2-3",
+          "monto_centavos": 8000,
+          "estado": "RECHAZADO",
+          "monto": "80.00"
+        }
+      },
+      {
+        "http": 200,
+        "datos": {
+          "id_pago": "pay-carga-efc8f8b2-4",
+          "id_reserva": "carga-efc8f8b2-4",
+          "monto_centavos": 8000,
+          "estado": "REEMBOLSADO",
+          "monto": "80.00"
+        }
+      },
+      {
+        "http": 200,
+        "datos": {
+          "id_pago": "pay-carga-efc8f8b2-5",
+          "id_reserva": "carga-efc8f8b2-5",
+          "monto_centavos": 8000,
+          "estado": "REEMBOLSADO",
+          "monto": "80.00"
+        }
+      },
+      {
+        "http": 200,
+        "datos": {
+          "id_pago": "pay-carga-efc8f8b2-6",
+          "id_reserva": "carga-efc8f8b2-6",
+          "monto_centavos": 8000,
+          "estado": "RECHAZADO",
+          "monto": "80.00"
+        }
+      },
+      {
+        "http": 200,
+        "datos": {
+          "id_pago": "pay-carga-efc8f8b2-7",
+          "id_reserva": "carga-efc8f8b2-7",
+          "monto_centavos": 8000,
+          "estado": "RECHAZADO",
+          "monto": "80.00"
+        }
+      },
+      {
+        "http": 200,
+        "datos": {
+          "id_pago": "pay-carga-efc8f8b2-8",
+          "id_reserva": "carga-efc8f8b2-8",
+          "monto_centavos": 8000,
+          "estado": "RECHAZADO",
+          "monto": "80.00"
+        }
+      },
+      {
+        "http": 200,
+        "datos": {
+          "id_pago": "pay-carga-efc8f8b2-9",
+          "id_reserva": "carga-efc8f8b2-9",
+          "monto_centavos": 8000,
+          "estado": "RECHAZADO",
+          "monto": "80.00"
+        }
+      },
+      {
+        "http": 200,
+        "datos": {
+          "id_pago": "pay-carga-efc8f8b2-10",
+          "id_reserva": "carga-efc8f8b2-10",
+          "monto_centavos": 8000,
+          "estado": "RECHAZADO",
+          "monto": "80.00"
+        }
+      },
+      {
+        "http": 200,
+        "datos": {
+          "id_pago": "pay-carga-efc8f8b2-11",
+          "id_reserva": "carga-efc8f8b2-11",
+          "monto_centavos": 8000,
+          "estado": "RECHAZADO",
+          "monto": "80.00"
+        }
+      }
+    ]
+  },
+  "caida_circuit_breaker": {
+    "peticiones": [
+      {
+        "id_pago": "pay-caida-efc8f8b2-0",
+        "duracion_s": 0.048,
+        "http": 503,
+        "datos": {
+          "id_pago": "pay-caida-efc8f8b2-0",
+          "id_reserva": "caida-efc8f8b2-0",
+          "monto_centavos": 8000,
+          "estado": "RECHAZADO",
+          "monto": "80.00",
+          "fallback": "Pago no disponible, NO cobrado"
+        }
+      },
+      {
+        "id_pago": "pay-caida-efc8f8b2-1",
+        "duracion_s": 0.047,
+        "http": 503,
+        "datos": {
+          "id_pago": "pay-caida-efc8f8b2-1",
+          "id_reserva": "caida-efc8f8b2-1",
+          "monto_centavos": 8000,
+          "estado": "RECHAZADO",
+          "monto": "80.00",
+          "fallback": "Pago no disponible, NO cobrado"
+        }
+      },
+      {
+        "id_pago": "pay-caida-efc8f8b2-2",
+        "duracion_s": 0.039,
+        "http": 503,
+        "datos": {
+          "id_pago": "pay-caida-efc8f8b2-2",
+          "id_reserva": "caida-efc8f8b2-2",
+          "monto_centavos": 8000,
+          "estado": "RECHAZADO",
+          "monto": "80.00",
+          "fallback": "Pago no disponible, NO cobrado"
+        }
+      }
+    ],
+    "metricas": {
+      "http": 200,
+      "datos": {
+        "circuit_breaker": "OPEN",
+        "fallos_consecutivos": 2,
+        "bulkhead_en_uso": 0,
+        "bulkhead_capacidad": 2,
+        "umbral": 2,
+        "llamadas_pasarela": 2,
+        "exitos": 0,
+        "fallos": 2,
+        "timeouts": 0,
+        "rechazos_circuito": 1,
+        "rechazos_bulkhead": 0,
+        "fallbacks": 1,
+        "transiciones_open": 1
+      }
+    }
+  },
+  "recuperacion_circuit_breaker": {
+    "peticion": {
+      "id_pago": "pay-recuperacion-efc8f8b2-1",
+      "duracion_s": 0.07,
+      "http": 201,
+      "datos": {
+        "id_pago": "pay-recuperacion-efc8f8b2-1",
+        "id_reserva": "recuperacion-efc8f8b2-1",
+        "monto_centavos": 8000,
+        "estado": "COBRADO",
+        "monto": "80.00"
+      }
+    },
+    "metricas": {
+      "http": 200,
+      "datos": {
+        "circuit_breaker": "CLOSED",
+        "fallos_consecutivos": 0,
+        "bulkhead_en_uso": 0,
+        "bulkhead_capacidad": 2,
+        "umbral": 2,
+        "llamadas_pasarela": 3,
+        "exitos": 1,
+        "fallos": 2,
+        "timeouts": 0,
+        "rechazos_circuito": 1,
+        "rechazos_bulkhead": 0,
+        "fallbacks": 1,
+        "transiciones_open": 1
+      }
+    }
+  },
+  "timeout_incierto": {
+    "antes": {
+      "http": 202,
+      "datos": {
+        "id_reserva": "tarde-efc8f8b2",
+        "id_pago": "pay-tarde-efc8f8b2",
+        "id_voucher": "voucher-tarde-efc8f8b2",
+        "estado": "PENDIENTE_PAGO",
+        "error": "Pago sin confirmacion definitiva",
+        "actualizado": "2026-11-22T05:17:42.992647+00:00"
+      }
+    },
+    "despues": {
+      "http": 502,
+      "datos": {
+        "id_reserva": "tarde-efc8f8b2",
+        "id_pago": "pay-tarde-efc8f8b2",
+        "id_voucher": "voucher-tarde-efc8f8b2",
+        "estado": "COMPENSADA",
+        "error": "Pago resuelto despues de respuesta incierta",
+        "actualizado": "2026-11-22T05:17:45.380067+00:00"
+      }
+    },
+    "pago": {
+      "http": 200,
+      "datos": {
+        "id_pago": "pay-tarde-efc8f8b2",
+        "id_reserva": "tarde-efc8f8b2",
+        "monto_centavos": 8000,
+        "estado": "REEMBOLSADO",
+        "monto": "80.00"
+      }
+    },
+    "habitacion": {
+      "http": 200,
+      "datos": {
+        "id_reserva": "tarde-efc8f8b2",
+        "habitacion_id": 4022935492,
+        "fecha_inicio": "2027-01-10",
+        "fecha_fin": "2027-01-13",
+        "estado": "LIBERADA"
+      }
+    }
+  }
+}
