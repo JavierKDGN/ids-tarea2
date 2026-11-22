@@ -1,0 +1,238 @@
+openapi: 3.0.3
+info:
+  title: Pasarela de pago externa (simulada) - Contrato API v1
+  version: 1.0.0
+  description: |
+    Simula al proveedor externo de pagos. **Solo la usa el servicio Pagos**; ningun otro componente la llama.
+    Base propia: SQLite (`PASARELA_DB`). Interno (red de Docker).
+
+    Al ser un tercero, NO sigue el formato `Error` del proyecto: sus errores son el `{"detail": ...}` por defecto
+    de FastAPI, y Pagos los interpreta tal cual. No unificar su formato sin adaptar Pagos
+    (Pagos lee `detail.estado == "NO_COBRADO"`).
+
+    ## Modos de fallo (se cambian en caliente con `POST /chaos`, sin tocar el codigo)
+    | Modo   | Configuracion                                              | Efecto                                                     |
+    |--------|------------------------------------------------------------|------------------------------------------------------------|
+    | normal | `latencia_segundos: 0, forzar_error: false`                | Cobra y responde 201                                       |
+    | lento  | `latencia_segundos: N` (0-30)                              | Espera N s **antes** de registrar el cobro y responder     |
+    | caido  | `forzar_error: true`                                       | Responde 503 `NO_COBRADO` (no se registra cobro)           |
+
+    La demora ocurre ANTES de registrar el cobro. Asi se reproduce el caso peligroso: el cliente agota su timeout
+    pero la pasarela termina cobrando despues (por eso Pagos reconcilia en vez de asumir).
+    Idempotencia por `id_pago`.
+
+    `x-estado`: todas `implementado`.
+servers:
+  - url: http://pasarela:8004
+    description: Red interna de Docker Compose
+  - url: http://127.0.0.1:8004
+    description: Ejecucion local
+tags:
+  - name: Cobros
+  - name: Fallos (demo)
+  - name: Operacion
+paths:
+  /cobros:
+    post:
+      tags: [Cobros]
+      operationId: pasarela_cobrar
+      summary: Registrar un cobro
+      x-estado: implementado
+      parameters:
+        - $ref: './common.yaml#/components/parameters/XCorrelationID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CobroRequest'
+            example:
+              id_pago: pay-res-3fa85f64b1c2
+              id_reserva: res-3fa85f64b1c2
+              monto_centavos: 12550
+      responses:
+        '201':
+          description: Cobro registrado, o repeticion idempotente (devuelve el registro existente).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cobro'
+        '409':
+          description: '`id_pago` usado con otros datos.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorPasarelaTexto'
+        '503':
+          description: Pasarela caida (simulada). Garantiza que NO se cobro.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorPasarelaNoCobrado'
+              example:
+                detail:
+                  estado: NO_COBRADO
+                  razon: Pasarela caida (simulada)
+        '422':
+          description: Cuerpo invalido (validacion estandar de FastAPI).
+
+  /cobros/{id_pago}:
+    get:
+      tags: [Cobros]
+      operationId: pasarela_consultar
+      summary: Consultar un cobro
+      description: Un 404 NO prueba que el cobro no ocurrira (podria estar demorado).
+      x-estado: implementado
+      parameters:
+        - name: id_pago
+          in: path
+          required: true
+          schema:
+            $ref: './common.yaml#/components/schemas/IdPago'
+      responses:
+        '200':
+          description: Cobro encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cobro'
+        '404':
+          description: Cobro aun no registrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorPasarelaTexto'
+
+  /cobros/{id_pago}/reembolsar:
+    post:
+      tags: [Cobros]
+      operationId: pasarela_reembolsar
+      summary: Reembolsar un cobro
+      description: Idempotente.
+      x-estado: implementado
+      parameters:
+        - name: id_pago
+          in: path
+          required: true
+          schema:
+            $ref: './common.yaml#/components/schemas/IdPago'
+        - $ref: './common.yaml#/components/parameters/XCorrelationID'
+      responses:
+        '200':
+          description: Reembolsado.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id_pago, estado]
+                properties:
+                  id_pago:
+                    $ref: './common.yaml#/components/schemas/IdPago'
+                  estado:
+                    type: string
+                    enum: [REEMBOLSADO]
+        '404':
+          description: Cobro no encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorPasarelaTexto'
+
+  /chaos:
+    post:
+      tags: [Fallos (demo)]
+      operationId: pasarela_chaos
+      summary: Configurar el modo de fallo (normal / lento / caido)
+      x-estado: implementado
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                latencia_segundos:
+                  type: number
+                  minimum: 0
+                  maximum: 30
+                  default: 0
+                forzar_error:
+                  type: boolean
+                  default: false
+            examples:
+              lento:
+                value: {latencia_segundos: 2, forzar_error: false}
+              caido:
+                value: {latencia_segundos: 0, forzar_error: true}
+              normal:
+                value: {latencia_segundos: 0, forzar_error: false}
+      responses:
+        '200':
+          description: Configuracion vigente.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  latencia_segundos: {type: number}
+                  forzar_error: {type: boolean}
+
+  /health:
+    get:
+      tags: [Operacion]
+      operationId: pasarela_health
+      summary: Healthcheck
+      x-estado: implementado
+      responses:
+        '200':
+          description: Servicio operativo.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Health'
+
+components:
+  schemas:
+    CobroRequest:
+      type: object
+      required: [id_pago, id_reserva, monto_centavos]
+      properties:
+        id_pago:
+          $ref: './common.yaml#/components/schemas/IdPago'
+        id_reserva:
+          $ref: './common.yaml#/components/schemas/IdReserva'
+        monto_centavos:
+          type: integer
+          minimum: 1
+    Cobro:
+      type: object
+      required: [id_pago, id_reserva, monto_centavos, estado]
+      properties:
+        id_pago:
+          $ref: './common.yaml#/components/schemas/IdPago'
+        id_reserva:
+          $ref: './common.yaml#/components/schemas/IdReserva'
+        monto_centavos:
+          type: integer
+        estado:
+          type: string
+          enum: [COBRADO, REEMBOLSADO]
+    ErrorPasarelaTexto:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: string
+    ErrorPasarelaNoCobrado:
+      type: object
+      required: [detail]
+      properties:
+        detail:
+          type: object
+          required: [estado]
+          properties:
+            estado:
+              type: string
+              enum: [NO_COBRADO]
+            razon:
+              type: string

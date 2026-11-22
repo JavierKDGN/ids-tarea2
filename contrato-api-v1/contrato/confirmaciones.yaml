@@ -1,0 +1,238 @@
+openapi: 3.0.3
+info:
+  title: Servicio Confirmaciones - Contrato API v1
+  version: 1.0.0
+  description: |
+    Emite y anula el voucher de una reserva. Base propia: SQLite (`CONFIRMACIONES_DB`).
+    **Interno**: no se expone fuera de la red de Docker.
+
+    Reglas de negocio:
+    - "No se confirma sin garantia cobrada" la garantiza la **Saga**, que consulta Pagos y solo
+      entonces llama a `POST /confirmaciones`. Este servicio NO consulta a Pagos (sin dependencias
+      directas entre servicios de dominio).
+    - Idempotencia: la clave es `id_voucher`. Repetir la emision con el mismo `id_reserva` devuelve el voucher
+      existente; con otro `id_reserva` responde 409; si ya esta `ANULADO` no puede reemitirse (409).
+    - `anular` es idempotente.
+    - Inyeccion de fallos para el escenario 2: `POST /chaos {"forzar_error": true}` hace que la emision
+      falle con 500 *antes* de persistir nada. Se activa en caliente, sin tocar el codigo.
+      Solo accesible desde la red interna (`docker compose exec`); no se publica en el Gateway.
+
+    `x-estado`: `implementado` | `ajustar` | `nuevo`. Ajuste global pendiente: formato de error `Error`
+    y registro de `X-Correlation-ID` en logs (hoy no hay logging en este servicio).
+servers:
+  - url: http://confirmaciones:8003
+    description: Red interna de Docker Compose
+  - url: http://127.0.0.1:8003
+    description: Ejecucion local
+tags:
+  - name: Confirmaciones
+  - name: Fallos (demo)
+  - name: Operacion
+paths:
+  /confirmaciones:
+    post:
+      tags: [Confirmaciones]
+      operationId: confirmaciones_emitir
+      summary: Emitir el voucher (paso 3 de la Saga)
+      x-estado: implementado
+      parameters:
+        - $ref: './common.yaml#/components/parameters/XCorrelationID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmacionRequest'
+            example:
+              id_voucher: voucher-res-3fa85f64b1c2
+              id_reserva: res-3fa85f64b1c2
+      responses:
+        '201':
+          description: Voucher emitido, o repeticion idempotente de un voucher `EMITIDO`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Voucher'
+              example:
+                id_voucher: voucher-res-3fa85f64b1c2
+                id_reserva: res-3fa85f64b1c2
+                estado: EMITIDO
+        '409':
+          description: |
+            `IDEMPOTENCY_CONFLICT` (mismo `id_voucher` con otro `id_reserva`) o
+            `VOUCHER_YA_ANULADO` (no puede reemitirse).
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                error: conflicto
+                code: VOUCHER_YA_ANULADO
+                message: El voucher ya fue anulado y no puede reemitirse
+        '422':
+          $ref: './common.yaml#/components/responses/Validacion'
+        '500':
+          description: Fallo de emision (error forzado con `/chaos` o error interno). No se persistio ningun voucher.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Error'
+              example:
+                error: error_interno
+                code: CONFIRMACION_NO_DISPONIBLE
+                message: Confirmacion no disponible (Error forzado)
+
+  /confirmaciones/{id_voucher}:
+    get:
+      tags: [Confirmaciones]
+      operationId: confirmaciones_obtener
+      summary: Consultar un voucher por su id
+      description: Usado por la Saga para verificar el estado real tras una respuesta incierta.
+      x-estado: implementado
+      parameters:
+        - name: id_voucher
+          in: path
+          required: true
+          schema:
+            $ref: './common.yaml#/components/schemas/IdVoucher'
+        - $ref: './common.yaml#/components/parameters/XCorrelationID'
+      responses:
+        '200':
+          description: Voucher encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoucherCompleto'
+        '404':
+          $ref: './common.yaml#/components/responses/NoEncontrado'
+
+  /confirmaciones/{id_voucher}/anular:
+    post:
+      tags: [Confirmaciones]
+      operationId: confirmaciones_anular
+      summary: Anular el voucher (compensacion del paso 3)
+      description: Idempotente.
+      x-estado: implementado
+      parameters:
+        - name: id_voucher
+          in: path
+          required: true
+          schema:
+            $ref: './common.yaml#/components/schemas/IdVoucher'
+        - $ref: './common.yaml#/components/parameters/XCorrelationID'
+      responses:
+        '200':
+          description: Voucher anulado.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id_voucher, estado]
+                properties:
+                  id_voucher:
+                    $ref: './common.yaml#/components/schemas/IdVoucher'
+                  estado:
+                    type: string
+                    enum: [ANULADO]
+                  mensaje:
+                    type: string
+                    example: Voucher anulado
+        '404':
+          $ref: './common.yaml#/components/responses/NoEncontrado'
+
+  /confirmaciones/reserva/{id_reserva}:
+    get:
+      tags: [Confirmaciones]
+      operationId: confirmaciones_por_reserva
+      summary: Consultar la confirmacion asociada a una reserva
+      description: Devuelve el voucher mas reciente de la reserva. Lo consume el BFF para armar el resumen.
+      x-estado: implementado
+      parameters:
+        - $ref: './common.yaml#/components/parameters/IdReservaPath'
+        - $ref: './common.yaml#/components/parameters/XCorrelationID'
+      responses:
+        '200':
+          description: Voucher encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoucherCompleto'
+        '404':
+          $ref: './common.yaml#/components/responses/NoEncontrado'
+
+  /chaos:
+    post:
+      tags: [Fallos (demo)]
+      operationId: confirmaciones_chaos
+      summary: Activar o desactivar el fallo de emision (escenario 2)
+      description: Estado en memoria; se pierde al reiniciar el contenedor (por defecto `false`).
+      x-estado: implementado
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                forzar_error:
+                  type: boolean
+                  default: false
+            example:
+              forzar_error: true
+      responses:
+        '200':
+          description: Configuracion aplicada.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mensaje:
+                    type: string
+                  estado_actual:
+                    type: object
+                    properties:
+                      forzar_error:
+                        type: boolean
+
+  /health:
+    get:
+      tags: [Operacion]
+      operationId: confirmaciones_health
+      summary: Healthcheck
+      x-estado: implementado
+      responses:
+        '200':
+          description: Servicio operativo.
+          content:
+            application/json:
+              schema:
+                $ref: './common.yaml#/components/schemas/Health'
+
+components:
+  schemas:
+    ConfirmacionRequest:
+      type: object
+      required: [id_voucher, id_reserva]
+      properties:
+        id_voucher:
+          $ref: './common.yaml#/components/schemas/IdVoucher'
+        id_reserva:
+          $ref: './common.yaml#/components/schemas/IdReserva'
+    Voucher:
+      type: object
+      required: [id_voucher, id_reserva, estado]
+      properties:
+        id_voucher:
+          $ref: './common.yaml#/components/schemas/IdVoucher'
+        id_reserva:
+          $ref: './common.yaml#/components/schemas/IdReserva'
+        estado:
+          $ref: './common.yaml#/components/schemas/EstadoVoucher'
+        fecha_emision:
+          $ref: './common.yaml#/components/schemas/DateTime'
+    VoucherCompleto:
+      allOf:
+        - $ref: '#/components/schemas/Voucher'
+        - type: object
+          required: [fecha_emision]
