@@ -2,7 +2,7 @@ name: ids-tarea2
 
 # Todos los servicios usan la misma imagen (Dockerfile) y cambian SERVICIO/PORT.
 # Cada servicio tiene su propia base SQLite en su propio volumen.
-# Solo se publica un puerto al host: hoy la saga (TEMPORAL); en el paso 2 pasa a ser solo el gateway.
+# Solo se publica un puerto al host: el del gateway. Todo lo demas vive en la red interna.
 
 x-servicio: &servicio
   build: .
@@ -78,9 +78,24 @@ services:
       pagos: {condition: service_healthy}
       confirmaciones: {condition: service_healthy}
     healthcheck: *hc
-    # TEMPORAL: se elimina cuando exista el gateway (paso 2)
+
+  gateway:
+    <<: *servicio
+    container_name: gateway
+    environment:
+      SERVICIO: gateway
+      PORT: "8080"
+      SAGA_URL: http://saga:8000
+      BFF_URL: http://bff:8005
+      HABITACIONES_URL: http://habitaciones:8001
+      GATEWAY_TOKENS: ${GATEWAY_TOKENS:-demo:demo-token}
+      RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-60}
+    depends_on:
+      saga: {condition: service_healthy}
+      habitaciones: {condition: service_healthy}
+    healthcheck: *hc
     ports:
-      - "${SAGA_HOST_PORT:-8000}:8000"
+      - "${GW_HOST_PORT:-8080}:8080"
 
 networks:
   interna:
