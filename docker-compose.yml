@@ -1,0 +1,93 @@
+name: ids-tarea2
+
+# Todos los servicios usan la misma imagen (Dockerfile) y cambian SERVICIO/PORT.
+# Cada servicio tiene su propia base SQLite en su propio volumen.
+# Solo se publica un puerto al host: hoy la saga (TEMPORAL); en el paso 2 pasa a ser solo el gateway.
+
+x-servicio: &servicio
+  build: .
+  restart: unless-stopped
+  networks: [interna]
+
+services:
+  pasarela:
+    <<: *servicio
+    container_name: pasarela
+    environment:
+      SERVICIO: pasarela
+      PORT: "8004"
+      PASARELA_DB: /data/pasarela.db
+    volumes: [pasarela-data:/data]
+    healthcheck: &hc
+      test: ["CMD", "python", "-c", "import os,urllib.request;urllib.request.urlopen('http://127.0.0.1:'+os.environ['PORT']+'/health',timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  habitaciones:
+    <<: *servicio
+    container_name: habitaciones
+    environment:
+      SERVICIO: habitaciones
+      PORT: "8001"
+      HABITACIONES_DB: /data/habitaciones.db
+    volumes: [habitaciones-data:/data]
+    healthcheck: *hc
+
+  pagos:
+    <<: *servicio
+    container_name: pagos
+    environment:
+      SERVICIO: pagos
+      PORT: "8002"
+      PAGOS_DB: /data/pagos.db
+      PASARELA_URL: http://pasarela:8004
+      PASARELA_TIMEOUT: ${PASARELA_TIMEOUT:-1.0}
+      CB_FAILURE_THRESHOLD: ${CB_FAILURE_THRESHOLD:-2}
+      CB_RECOVERY_SECONDS: ${CB_RECOVERY_SECONDS:-4}
+      BULKHEAD_MAX_CONCURRENT: ${BULKHEAD_MAX_CONCURRENT:-2}
+    volumes: [pagos-data:/data]
+    depends_on:
+      pasarela: {condition: service_healthy}
+    healthcheck: *hc
+
+  confirmaciones:
+    <<: *servicio
+    container_name: confirmaciones
+    environment:
+      SERVICIO: confirmaciones
+      PORT: "8003"
+      CONFIRMACIONES_DB: /data/confirmaciones.db
+    volumes: [confirmaciones-data:/data]
+    healthcheck: *hc
+
+  saga:
+    <<: *servicio
+    container_name: saga
+    environment:
+      SERVICIO: saga
+      PORT: "8000"
+      SAGA_DB: /data/saga.db
+      HABITACIONES_URL: http://habitaciones:8001
+      PAGOS_URL: http://pagos:8002
+      CONFIRMACION_URL: http://confirmaciones:8003
+      SERVICES_TIMEOUT: ${SERVICES_TIMEOUT:-2.5}
+    volumes: [saga-data:/data]
+    depends_on:
+      habitaciones: {condition: service_healthy}
+      pagos: {condition: service_healthy}
+      confirmaciones: {condition: service_healthy}
+    healthcheck: *hc
+    # TEMPORAL: se elimina cuando exista el gateway (paso 2)
+    ports:
+      - "${SAGA_HOST_PORT:-8000}:8000"
+
+networks:
+  interna:
+
+volumes:
+  pasarela-data:
+  habitaciones-data:
+  pagos-data:
+  confirmaciones-data:
+  saga-data:

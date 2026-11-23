@@ -1,0 +1,13 @@
+.git
+.venv
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+data/
+evidence/
+tests/
+scripts/
+contrato-api-v1/
+*.pdf
+.env
