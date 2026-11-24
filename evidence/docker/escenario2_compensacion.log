@@ -1,19 +1,19 @@
-2026-11-24 00:31:28,182 INFO habitaciones.http evento=request servicio=habitaciones metodo=POST ruta=/reservas estado=201 ms=11 corr=esc2-58e2dcb5
-2026-11-24 00:31:28,192 INFO saga evento=estado_saga reserva=comp-b100c464 estado=HABITACION_RESERVADA error=None corr=esc2-58e2dcb5
-2026-11-24 00:31:28,235 INFO pasarela evento=cobro_realizado pago=pay-comp-b100c464 reserva=comp-b100c464 corr=esc2-58e2dcb5
-2026-11-24 00:31:28,236 INFO pasarela.http evento=request servicio=pasarela metodo=POST ruta=/cobros estado=201 ms=13 corr=esc2-58e2dcb5
-2026-11-24 00:31:28,250 INFO pagos.http evento=request servicio=pagos metodo=POST ruta=/pagos estado=201 ms=54 corr=esc2-58e2dcb5
-2026-11-24 00:31:28,263 INFO saga evento=estado_saga reserva=comp-b100c464 estado=PAGO_COBRADO error=None corr=esc2-58e2dcb5
-2026-11-24 00:31:28,266 INFO pagos.http evento=request servicio=pagos metodo=GET ruta=/pagos/pay-comp-b100c464 estado=200 ms=2 corr=esc2-58e2dcb5
-2026-11-24 00:31:28,273 INFO confirmaciones.http evento=request servicio=confirmaciones metodo=POST ruta=/confirmaciones estado=500 ms=2 corr=esc2-58e2dcb5
-2026-11-24 00:31:28,283 INFO saga evento=estado_saga reserva=comp-b100c464 estado=COMPENSANDO error=Confirmacion: HTTP 500 corr=esc2-58e2dcb5
-2026-11-24 00:31:28,287 INFO confirmaciones.http evento=request servicio=confirmaciones metodo=GET ruta=/confirmaciones/voucher-comp-b100c464 estado=404 ms=2 corr=esc2-58e2dcb5
-2026-11-24 00:31:28,292 INFO pagos.http evento=request servicio=pagos metodo=GET ruta=/pagos/pay-comp-b100c464 estado=200 ms=2 corr=esc2-58e2dcb5
-2026-11-24 00:31:28,325 INFO pasarela evento=reembolso_realizado pago=pay-comp-b100c464 corr=esc2-58e2dcb5
-2026-11-24 00:31:28,326 INFO pasarela.http evento=request servicio=pasarela metodo=POST ruta=/cobros/pay-comp-b100c464/reembolsar estado=200 ms=13 corr=esc2-58e2dcb5
-2026-11-24 00:31:28,340 INFO pagos.http evento=request servicio=pagos metodo=POST ruta=/pagos/pay-comp-b100c464/reembolsar estado=200 ms=44 corr=esc2-58e2dcb5
-2026-11-24 00:31:28,345 INFO habitaciones.http evento=request servicio=habitaciones metodo=GET ruta=/reservas/comp-b100c464 estado=200 ms=2 corr=esc2-58e2dcb5
-2026-11-24 00:31:28,358 INFO habitaciones.http evento=request servicio=habitaciones metodo=POST ruta=/reservas/comp-b100c464/liberar estado=200 ms=11 corr=esc2-58e2dcb5
-2026-11-24 00:31:28,370 INFO saga evento=estado_saga reserva=comp-b100c464 estado=COMPENSADA error=Confirmacion: HTTP 500 corr=esc2-58e2dcb5
-2026-11-24 00:31:28,372 INFO saga.http evento=request servicio=saga metodo=POST ruta=/reservas estado=502 ms=230 corr=esc2-58e2dcb5
-2026-11-24 00:31:28,374 INFO gateway evento=proxy cliente=demo POST /api/reservas -> 502 corr=esc2-58e2dcb5
+2026-11-24 02:18:30,939 INFO habitaciones.http evento=request servicio=habitaciones metodo=POST ruta=/reservas estado=201 ms=11 corr=esc2-c4a06c70
+2026-11-24 02:18:30,952 INFO saga evento=estado_saga reserva=comp-5f829b1e estado=HABITACION_RESERVADA error=None corr=esc2-c4a06c70
+2026-11-24 02:18:30,994 INFO pasarela evento=cobro_realizado pago=pay-comp-5f829b1e reserva=comp-5f829b1e corr=esc2-c4a06c70
+2026-11-24 02:18:30,995 INFO pasarela.http evento=request servicio=pasarela metodo=POST ruta=/cobros estado=201 ms=13 corr=esc2-c4a06c70
+2026-11-24 02:18:31,009 INFO pagos.http evento=request servicio=pagos metodo=POST ruta=/pagos estado=201 ms=54 corr=esc2-c4a06c70
+2026-11-24 02:18:31,021 INFO saga evento=estado_saga reserva=comp-5f829b1e estado=PAGO_COBRADO error=None corr=esc2-c4a06c70
+2026-11-24 02:18:31,026 INFO pagos.http evento=request servicio=pagos metodo=GET ruta=/pagos/pay-comp-5f829b1e estado=200 ms=3 corr=esc2-c4a06c70
+2026-11-24 02:18:31,034 INFO confirmaciones.http evento=request servicio=confirmaciones metodo=POST ruta=/confirmaciones estado=500 ms=2 corr=esc2-c4a06c70
+2026-11-24 02:18:31,044 INFO saga evento=estado_saga reserva=comp-5f829b1e estado=COMPENSANDO error=Confirmacion: HTTP 500 corr=esc2-c4a06c70
+2026-11-24 02:18:31,049 INFO confirmaciones.http evento=request servicio=confirmaciones metodo=GET ruta=/confirmaciones/voucher-comp-5f829b1e estado=404 ms=2 corr=esc2-c4a06c70
+2026-11-24 02:18:31,054 INFO pagos.http evento=request servicio=pagos metodo=GET ruta=/pagos/pay-comp-5f829b1e estado=200 ms=2 corr=esc2-c4a06c70
+2026-11-24 02:18:31,091 INFO pasarela evento=reembolso_realizado pago=pay-comp-5f829b1e corr=esc2-c4a06c70
+2026-11-24 02:18:31,092 INFO pasarela.http evento=request servicio=pasarela metodo=POST ruta=/cobros/pay-comp-5f829b1e/reembolsar estado=200 ms=15 corr=esc2-c4a06c70
+2026-11-24 02:18:31,107 INFO pagos.http evento=request servicio=pagos metodo=POST ruta=/pagos/pay-comp-5f829b1e/reembolsar estado=200 ms=49 corr=esc2-c4a06c70
+2026-11-24 02:18:31,113 INFO habitaciones.http evento=request servicio=habitaciones metodo=GET ruta=/reservas/comp-5f829b1e estado=200 ms=2 corr=esc2-c4a06c70
+2026-11-24 02:18:31,131 INFO habitaciones.http evento=request servicio=habitaciones metodo=POST ruta=/reservas/comp-5f829b1e/liberar estado=200 ms=15 corr=esc2-c4a06c70
+2026-11-24 02:18:31,144 INFO saga evento=estado_saga reserva=comp-5f829b1e estado=COMPENSADA error=Confirmacion: HTTP 500 corr=esc2-c4a06c70
+2026-11-24 02:18:31,147 INFO saga.http evento=request servicio=saga metodo=POST ruta=/reservas estado=502 ms=250 corr=esc2-c4a06c70
+2026-11-24 02:18:31,150 INFO gateway evento=proxy cliente=demo POST /api/reservas -> 502 corr=esc2-c4a06c70

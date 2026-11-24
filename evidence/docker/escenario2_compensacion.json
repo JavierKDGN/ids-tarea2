@@ -1,32 +1,32 @@
 {
-  "id_reserva": "comp-b100c464",
-  "correlation_id": "esc2-58e2dcb5",
+  "id_reserva": "comp-5f829b1e",
+  "correlation_id": "esc2-c4a06c70",
   "respuesta": {
     "http": 502,
-    "duracion_s": 0.767,
+    "duracion_s": 0.861,
     "datos": {
-      "id_reserva": "comp-b100c464",
-      "id_pago": "pay-comp-b100c464",
-      "id_voucher": "voucher-comp-b100c464",
+      "id_reserva": "comp-5f829b1e",
+      "id_pago": "pay-comp-5f829b1e",
+      "id_voucher": "voucher-comp-5f829b1e",
       "estado": "COMPENSADA",
       "error": "Confirmacion: HTTP 500",
-      "actualizado": "2026-11-24T00:31:28.361414+00:00"
+      "actualizado": "2026-11-24T02:18:31.134566+00:00"
     }
   },
   "resumen_bff": {
     "http": 200,
-    "duracion_s": 0.63,
+    "duracion_s": 0.53,
     "datos": {
-      "id_reserva": "comp-b100c464",
+      "id_reserva": "comp-5f829b1e",
       "mensaje": "La reserva no pudo completarse y fue revertida",
       "degradado": false,
       "saga": {
         "estado": "COMPENSADA",
         "error": "Confirmacion: HTTP 500",
-        "actualizado": "2026-11-24T00:31:28.361414+00:00"
+        "actualizado": "2026-11-24T02:18:31.134566+00:00"
       },
       "habitacion": {
-        "habitacion_id": 413196,
+        "habitacion_id": 261692,
         "fecha_inicio": "2027-03-01",
         "fecha_fin": "2027-03-04",
         "estado": "LIBERADA"
@@ -37,15 +37,15 @@
         "habitacion": "OK",
         "confirmacion": "NO_EXISTE"
       },
-      "generado": "2026-11-24T00:31:30.084957+00:00"
+      "generado": "2026-11-24T02:18:32.858013+00:00"
     }
   },
   "estados": {
     "habitacion": {
       "http": 200,
       "datos": {
-        "id_reserva": "comp-b100c464",
-        "habitacion_id": 413196,
+        "id_reserva": "comp-5f829b1e",
+        "habitacion_id": 261692,
         "fecha_inicio": "2027-03-01",
         "fecha_fin": "2027-03-04",
         "estado": "LIBERADA"
@@ -54,8 +54,8 @@
     "pago": {
       "http": 200,
       "datos": {
-        "id_pago": "pay-comp-b100c464",
-        "id_reserva": "comp-b100c464",
+        "id_pago": "pay-comp-5f829b1e",
+        "id_reserva": "comp-5f829b1e",
         "monto_centavos": 8000,
         "estado": "REEMBOLSADO",
         "monto": "80.00"
@@ -64,7 +64,9 @@
     "confirmacion": {
       "http": 404,
       "datos": {
-        "detail": "voucher no encontrado"
+        "error": "no_encontrado",
+        "code": "RECURSO_NO_ENCONTRADO",
+        "message": "voucher no encontrado"
       }
     }
   },
