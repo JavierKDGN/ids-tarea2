@@ -49,7 +49,10 @@ Variables principales (`.env.example`):
 | `PASARELA_TIMEOUT`        | Timeout de Pagos hacia la pasarela (s)                | 1.0                 |
 | `CB_FAILURE_THRESHOLD`    | Fallos seguidos para abrir el Circuit Breaker         | 2                   |
 | `CB_RECOVERY_SECONDS`     | Espera antes de probar de nuevo (s)                   | 4                   |
-| `BULKHEAD_MAX_CONCURRENT` | Llamadas simultáneas a la pasarela                   | 2                   |
+| `BULKHEAD_MAX_CONCURRENT` | Llamadas simultáneas a la pasarela                   | 10                  |
+| `PASARELA_REINTENTOS`     | Reintentos con backoff si la pasarela confirma que no cobró (0 los desactiva) | 0 |
+| `PASARELA_BACKOFF_S`      | Espera inicial entre reintentos (s); se duplica en cada uno | 0.2           |
+| `RECONCILIACION_SEGUNDOS` | Cada cuántos segundos la saga reintenta sola las reservas pendientes (0 la desactiva) | 20 |
 | `SERVICES_TIMEOUT`        | Timeout de la saga hacia cada servicio (s)            | 2.5                 |
 | `BFF_TIMEOUT`             | Espera del BFF por cada fuente (s)                    | 2.0                 |
 
@@ -156,6 +159,11 @@ docker compose logs --no-log-prefix | grep reserva-001
 
 Si el cliente no envía el header, el gateway genera uno y lo devuelve en la respuesta.
 
+Métricas internas (no se publican por el gateway; se leen con `docker compose exec`):
+
+- Pagos, `GET /metricas`: estado del Circuit Breaker, uso del Bulkhead, llamadas, éxitos, fallos, timeouts, rechazos, reintentos y latencia de la pasarela (n, media, p50, p95, máximo).
+- Saga, `GET /metricas`: total de reservas y cantidad por estado.
+
 ## Tests
 
 ```bash
@@ -173,6 +181,8 @@ Cubren camino feliz, idempotencia, solape de fechas, compensación, bulkhead con
 3. 2PC vs SAGA: 2PC bloquea hasta recibir respuestas ralentizando los otros procesos y si un servicio se cae, todo el sistema tambien. Ademas al conectarlo con una pasarela externa (en este caso el servicio de pagos) no puede controlarlos, mientras que SAGA puede tomar acciones a nivel de aplicacion (por ejemplo reembolsar)
 4. Gateway sin lógica de negocio y BFF de solo lectura: el gateway autentica, limita y enruta; el BFF compone la respuesta para el cliente web. Las decisiones del gateway están en `contrato-api-v1/contrato/README.md`.
 5. Una sola imagen Docker para todos los servicios: cada contenedor elige su módulo con `SERVICIO` y su puerto con `PORT`.
+6. Reconciliación automática: la saga reintenta sola las reservas pendientes (por ejemplo un pago incierto por timeout). Si la pasarela cobró tarde, la reserva se compensa y el pago se reembolsa. Es configurable y los experimentos la desactivan para medir los patrones sin que limpie los cobros tardíos.
+7. Reintentos con backoff opcionales: solo cuando la pasarela confirma que no cobró (503 `NO_COBRADO` o error de conexión). Nunca tras un timeout, porque el cobro podría haberse hecho. Vienen desactivados por defecto.
 
 ## Uso de IA
 

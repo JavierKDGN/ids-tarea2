@@ -22,7 +22,7 @@ python experimentos/graficar_escenario3.py
 | BFF (8005) | Resumen de reserva en una sola respuesta (saga, habitaciones, confirmaciones). Solo lectura y no depende de Pagos. Degrada con `degradado: true`. |
 | Saga (8000) | Orquesta reservar, cobrar y confirmar; compensa en orden inverso. Ante un pago incierto queda `PENDIENTE_PAGO` y concilia después. |
 | Habitaciones (8001) | Reserva y libera; impide fechas superpuestas. Su estado final prueba la consistencia. |
-| Pagos (8002) | Dependencia frágil. Timeout 1 s, Circuit Breaker (abre tras 2 fallos, prueba a los 4 s), Bulkhead (2 simultáneas) y fallback "NO cobrado". Expone `/metricas`. |
+| Pagos (8002) | Dependencia frágil. Timeout 1 s, Circuit Breaker (abre tras 2 fallos, prueba a los 4 s), Bulkhead (2 simultáneas) y fallback "NO cobrado". Expone `/metricas`, con contadores y latencia de la pasarela. |
 | Pasarela simulada (8004) | `POST /chaos` provoca latencia o error sin tocar código. Con latencia cobra igual después de dormir. |
 | Confirmaciones (8003) | `POST /chaos` hace fallar la emisión del voucher: es la falla del último paso. |
 | Correlación (`src/common`) | Un `X-Correlation-ID` permite seguir una reserva en los logs de todos los contenedores. |
@@ -68,7 +68,8 @@ Gráficos: `experimentos/grafico_estados_pagos.png`, `grafico_pasarela_caida.png
 
 - **Latencia:** no distingue las configuraciones. Con 30 reservas simultáneas sin fallas ya tarda unos 5 s, por la capacidad del propio sistema (un proceso por servicio y SQLite). La evidencia es el estado de los pagos y las llamadas a la pasarela.
 - **Breaker:** con una pasarela que falla al instante no baja la latencia; evita llamadas.
-- **Bulkhead:** en una corrida informal de control, con capacidad 2 y sin fallas, parecía rechazar pagos legítimos. No lo verifiqué.
+- **Bulkhead:** con capacidad 2 y la pasarela sana, 3 reservas simultáneas dieron 1 `COMPENSADA` porque el bulkhead rechazó una llamada legítima. Por eso el valor por defecto del sistema pasó a 10 (6 rondas de 8 reservas simultáneas: 0 rechazos). La configuración A del escenario 3 fija la capacidad en 2 de forma explícita.
+- **Reconciliación y reintentos:** los experimentos fijan `RECONCILIACION_SEGUNDOS=0` y no usan reintentos, para medir los patrones sin que la saga compense sola los cobros tardíos. Con el valor por defecto (20 s), esas reservas se compensan solas: se probó con un cobro tardío, que quedó `COMPENSADA` con el pago reembolsado en unos 18 s.
 - **Repeticiones:** una sola ejecución por configuración, en Docker Desktop sin límites de recursos.
 
 ## Anexo: pruebas manuales

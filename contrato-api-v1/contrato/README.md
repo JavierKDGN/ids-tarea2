@@ -72,9 +72,9 @@ Las bases SQLite necesitan un volumen por servicio.
 
 Estado a 2026-11-23:
 
-1. **Formato de error unico** (`{error, code, message}`): **pendiente**. Gateway y BFF ya lo usan; Saga, Habitaciones,
-   Confirmaciones y Pagos siguen respondiendo `{"detail": ...}` (manejador global de `HTTPException` y
-   `RequestValidationError` sin hacer). El Gateway reenvia esos cuerpos tal como llegan.
+1. **Formato de error unico** (`{error, code, message}`): **hecho** (`src/common/errores.py`). Lo usan Gateway, BFF, Saga,
+   Habitaciones, Confirmaciones y Pagos; la Pasarela, por ser un tercero, conserva `{"detail": ...}`. El Gateway
+   reenvia los cuerpos de los servicios tal como llegan.
 2. **`X-Correlation-ID`** leido, registrado y propagado: **hecho** (`src/common/correlacion.py`).
 3. **Saga `GET /reservas/{id}`** responde 200 siempre que exista: **hecho**.
 4. **Pagos `POST /pagos/{id}/reembolsar`** responde 502 `PASARELA_NO_CONFIRMO` si la pasarela contesta con error HTTP: **hecho**.
