@@ -18,7 +18,7 @@ info:
       Solo accesible desde la red interna (`docker compose exec`); no se publica en el Gateway.
 
     `x-estado`: `implementado` | `ajustar` | `nuevo`. Ajuste global pendiente: formato de error `Error`
-    y registro de `X-Correlation-ID` en logs (hoy no hay logging en este servicio).
+    (hoy `{"detail": ...}`). El registro de `X-Correlation-ID` en logs ya esta hecho.
 servers:
   - url: http://confirmaciones:8003
     description: Red interna de Docker Compose

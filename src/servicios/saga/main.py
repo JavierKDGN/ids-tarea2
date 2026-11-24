@@ -30,17 +30,16 @@ class Reserva(BaseModel):
             raise ValueError("id_reserva debe contener solo letras, numeros, guion o guion bajo")
         return self
 
-def respuesta(s, creado=False):
+def respuesta(s, creado=False, consulta=False):
     estados = {"CONFIRMADA": 201 if creado else 200, "COMPENSADA": 502,
                "FALLIDA": 409}
-    http = estados.get(s["estado"], 202)
+    http = 200 if consulta else estados.get(s["estado"], 202)
     return JSONResponse(status_code=http, content={
         "id_reserva": s["id_reserva"], "id_pago": s["id_pago"],
         "id_voucher": s["id_voucher"], "estado": s["estado"],
         "error": s["error"], "actualizado": s["actualizado"]})
 
 @app.post("/reservas")
-@app.post("/api/reservar")  # Alias temporal para clientes del proyecto original.
 def reservar(req: Reserva, idempotency_key: str | None = Header(default=None)):
     if idempotency_key and (len(idempotency_key) > 128 or not idempotency_key.strip()):
         raise HTTPException(422, "Idempotency-Key invalida")
@@ -56,7 +55,7 @@ def obtener(id_reserva: str):
     s = consultar(id_reserva=id_reserva)
     if not s:
         raise HTTPException(404, "Reserva no encontrada")
-    return respuesta(s)
+    return respuesta(s, consulta=True)
 
 @app.post("/reservas/{id_reserva}/reconciliar")
 def reconciliar(id_reserva: str):

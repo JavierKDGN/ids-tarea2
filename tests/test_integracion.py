@@ -126,6 +126,23 @@ def test_compensar_reembolso_antes_de_liberar(server):
     assert httpx.post(f"{server['pagos']}/pagos/pay-{rid}/reembolsar").json()["estado"] == "REEMBOLSADO"
 
 
+def test_consulta_de_saga_responde_200_en_cualquier_estado(server):
+    chaos(server)
+    httpx.post(server["confirmaciones"] + "/chaos", json={"forzar_error": True})
+    rid = "consulta-" + uuid.uuid4().hex[:8]
+    try:
+        assert crear(server, rid, habitacion=31).status_code == 502
+    finally:
+        httpx.post(server["confirmaciones"] + "/chaos", json={"forzar_error": False})
+    consulta = httpx.get(f"{server['saga']}/reservas/{rid}")
+    assert consulta.status_code == 200
+    assert consulta.json()["estado"] == "COMPENSADA"
+    ocupada = "consulta-ocupada-" + uuid.uuid4().hex[:8]
+    assert crear(server, "consulta-base-" + uuid.uuid4().hex[:8], habitacion=32).json()["estado"] == "CONFIRMADA"
+    assert crear(server, ocupada, habitacion=32).json()["estado"] == "FALLIDA"
+    assert httpx.get(f"{server['saga']}/reservas/{ocupada}").status_code == 200
+
+
 def test_bulkhead_y_circuit_breaker(server):
     chaos(server, delay=1.5)
     def pagar(i):

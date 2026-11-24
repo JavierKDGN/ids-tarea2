@@ -12,9 +12,9 @@ info:
 
     ## Autenticacion (central)
     - `Authorization: Bearer <token>` en toda ruta `/api/*`. Falta o token invalido/expirado -> **401**.
-    - Propuesta: JWT HS256 firmado con un secreto compartido (`GATEWAY_JWT_SECRET`), con `sub` = id de cliente
-      y `exp`. Alternativa mas simple para el curso: tokens estaticos por cliente en variable de entorno.
-      El contrato solo exige el esquema Bearer.
+    - Implementado: tokens estaticos por cliente en la variable `GATEWAY_TOKENS` (`cliente:token,cliente2:token2`;
+      por defecto `demo:demo-token`). La alternativa de JWT HS256 no se implemento. El contrato solo exige el
+      esquema Bearer.
     - Los servicios internos confian en que la solicitud ya paso por el Gateway (no revalidan el token).
     - `GET /health` no requiere token.
 
@@ -43,7 +43,7 @@ info:
     Pagos, Confirmaciones, Pasarela y sus endpoints de demo (`/chaos`, `/metricas`, `/demo/*`) no se exponen.
     Para los escenarios de falla se activan dentro de la red (`docker compose exec`); ver README.
 
-    `x-estado`: todas **nuevo** (el Gateway aun no existe).
+    `x-estado`: todas **implementado** (`src/servicios/gateway/main.py`).
 servers:
   - url: http://localhost:8080
     description: Unico puerto publicado por docker compose (propuesto)
@@ -62,7 +62,7 @@ paths:
       description: |
         Camino feliz -> 201 `CONFIRMADA`. Fallo del ultimo paso -> 502 `COMPENSADA` (reembolso y liberacion hechos).
         Pago inseguro/incierto -> 202 `PENDIENTE_PAGO`. Habitacion ocupada -> 409 `FALLIDA`.
-      x-estado: nuevo
+      x-estado: implementado
       x-upstream: 'saga: POST /reservas'
       parameters:
         - $ref: './saga.yaml#/components/parameters/IdempotencyKey'
@@ -105,7 +105,7 @@ paths:
       tags: [Reservas]
       operationId: gw_obtener_reserva
       summary: Estado global de la reserva (Saga)
-      x-estado: nuevo
+      x-estado: implementado
       x-upstream: 'saga: GET /reservas/{id_reserva}'
       parameters:
         - $ref: './common.yaml#/components/parameters/IdReservaPath'
@@ -134,7 +134,7 @@ paths:
       operationId: gw_reconciliar_reserva
       summary: Reintentar una reserva pendiente
       description: Reanuda una Saga `PENDIENTE_*` (p. ej. pago incierto). Idempotente.
-      x-estado: nuevo
+      x-estado: implementado
       x-upstream: 'saga: POST /reservas/{id_reserva}/reconciliar'
       parameters:
         - $ref: './common.yaml#/components/parameters/IdReservaPath'
@@ -166,7 +166,7 @@ paths:
       summary: Vista agregada de la reserva (BFF web)
       description: |
         Compone Saga + Habitaciones + Confirmaciones en una sola respuesta. Funciona aunque Pagos este caido.
-      x-estado: nuevo
+      x-estado: implementado
       x-upstream: 'bff: GET /api/reservas/{id_reserva}/resumen'
       parameters:
         - $ref: './common.yaml#/components/parameters/IdReservaPath'
@@ -195,7 +195,7 @@ paths:
       operationId: gw_disponibilidad
       summary: Consultar disponibilidad de una habitacion
       description: Solo lectura; independiente de Pagos.
-      x-estado: nuevo
+      x-estado: implementado
       x-upstream: 'habitaciones: GET /disponibilidad'
       parameters:
         - name: habitacion_id
@@ -242,7 +242,7 @@ paths:
       operationId: gw_health
       summary: Healthcheck del Gateway
       security: []
-      x-estado: nuevo
+      x-estado: implementado
       responses:
         '200':
           description: Gateway operativo.

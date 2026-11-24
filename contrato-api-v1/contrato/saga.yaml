@@ -44,7 +44,7 @@ info:
     Toda llamada saliente usa `SERVICES_TIMEOUT` (def. 2.5 s).
 
     `x-estado`: `implementado` | `ajustar` | `nuevo`. Ajuste global pendiente: formato de error `Error`.
-    Retirar el alias temporal `POST /api/reservar` (no forma parte del contrato).
+    El alias temporal `POST /api/reservar` ya se retiro.
 servers:
   - url: http://saga:8000
     description: Red interna de Docker Compose
@@ -97,11 +97,7 @@ paths:
       description: |
         Usado por el BFF y por clientes que no recibieron respuesta (por ejemplo tras un 504 del Gateway).
         Solo lectura: no avanza la Saga.
-      x-estado: ajustar
-      x-ajuste: |
-        Hoy reutiliza el mapeo de `POST` y devuelve 502 para `COMPENSADA`, 409 para `FALLIDA` y 202 para estados
-        pendientes. Una consulta debe responder **200** siempre que la Saga exista (el estado va en `estado`).
-        Mientras no se aplique, el BFF debe aceptar cualquiera de esos codigos si el cuerpo es `ReservaSaga`.
+      x-estado: implementado
       parameters:
         - $ref: './common.yaml#/components/parameters/IdReservaPath'
         - $ref: './common.yaml#/components/parameters/XCorrelationID'

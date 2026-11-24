@@ -34,8 +34,8 @@ o `npx @redocly/cli lint contrato/gateway.yaml`. Los `$ref` entre archivos son r
 
 | Servicio | DNS interno | Puerto | Variables que consume |
 |---|---|---|---|
-| gateway (nuevo) | `gateway` | **8080 (publicado)** | `SAGA_URL`, `BFF_URL`, `HABITACIONES_URL`, `GATEWAY_JWT_SECRET`, `RATE_LIMIT_PER_MINUTE` |
-| bff (nuevo) | `bff` | 8005 | `SAGA_URL`, `HABITACIONES_URL`, `CONFIRMACION_URL`, `BFF_TIMEOUT` |
+| gateway | `gateway` | **8080 (publicado)** | `SAGA_URL`, `BFF_URL`, `HABITACIONES_URL`, `GATEWAY_TOKENS`, `RATE_LIMIT_PER_MINUTE`, `GATEWAY_TIMEOUT_POST`, `GATEWAY_TIMEOUT_GET` |
+| bff | `bff` | 8005 | `SAGA_URL`, `HABITACIONES_URL`, `CONFIRMACION_URL`, `BFF_TIMEOUT` |
 | saga | `saga` | 8000 | `SAGA_DB`, `HABITACIONES_URL`, `PAGOS_URL`, `CONFIRMACION_URL`, `SERVICES_TIMEOUT` |
 | habitaciones | `habitaciones` | 8001 | `HABITACIONES_DB` |
 | pagos | `pagos` | 8002 | `PAGOS_DB`, `PASARELA_URL`, `PASARELA_TIMEOUT`, `CB_FAILURE_THRESHOLD`, `CB_RECOVERY_SECONDS`, `BULKHEAD_MAX_CONCURRENT` |
@@ -68,20 +68,29 @@ Las bases SQLite necesitan un volumen por servicio.
 | `UPSTREAM_NO_DISPONIBLE` | 503 | Gateway |
 | `UPSTREAM_TIMEOUT` | 504 | Gateway |
 
-## Cambios que el contrato exige al codigo actual
+## Cambios que el contrato exigia al codigo actual
 
-1. **Formato de error unico** en Gateway, BFF, Saga, Habitaciones, Confirmaciones y Pagos (hoy `{"detail": ...}`):
-   manejador global de `HTTPException` y `RequestValidationError`. No tocar el formato de la Pasarela.
-2. **`X-Correlation-ID`** leido, registrado y propagado; agregar logging a Habitaciones y Confirmaciones.
-3. **Saga `GET /reservas/{id}`** debe devolver 200 siempre que exista (hoy copia el mapeo del POST: 502/409/202).
-4. **Pagos `POST /pagos/{id}/reembolsar`**: capturar `HTTPStatusError` y responder 502 (hoy 500).
-5. **Retirar** el alias `POST /api/reservar` de la Saga y **reemplazar** `bff/main.py` (borrar `bff/saga.py`).
-6. **Nuevos**: Gateway (auth, rate limit, enrutamiento, timeouts), BFF `resumen`, `Dockerfile` por servicio, `docker-compose.yml`.
+Estado a 2026-11-23:
 
-## Supuestos que conviene confirmar con el equipo (y con el docente)
+1. **Formato de error unico** (`{error, code, message}`): **pendiente**. Gateway y BFF ya lo usan; Saga, Habitaciones,
+   Confirmaciones y Pagos siguen respondiendo `{"detail": ...}` (manejador global de `HTTPException` y
+   `RequestValidationError` sin hacer). El Gateway reenvia esos cuerpos tal como llegan.
+2. **`X-Correlation-ID`** leido, registrado y propagado: **hecho** (`src/common/correlacion.py`).
+3. **Saga `GET /reservas/{id}`** responde 200 siempre que exista: **hecho**.
+4. **Pagos `POST /pagos/{id}/reembolsar`** responde 502 `PASARELA_NO_CONFIRMO` si la pasarela contesta con error HTTP: **hecho**.
+5. **Retirar** el alias `POST /api/reservar` de la Saga y **reemplazar** `bff/main.py` (borrar `bff/saga.py`): **hecho**.
+6. **Nuevos**: Gateway, BFF `resumen` y `docker-compose.yml`: **hechos**. En lugar de un `Dockerfile` por servicio hay uno
+   solo, comun, que elige el modulo con `SERVICIO` y `PORT`.
 
-- Token Bearer JWT (HS256) o tokens estaticos por cliente; 60 req/min por cliente; timeouts del Gateway de 10 s / 4 s.
-- Puertos nuevos: Gateway 8080 y BFF 8005; `BFF_TIMEOUT` 2.0 s.
-- El resumen del BFF no incluye Pagos (para que funcione con Pagos caido).
-- El Gateway responde 503 (no 502) cuando el destino no esta disponible, para no confundirlo con el 502 `COMPENSADA`.
-- Los endpoints de demo (`/chaos`, `/metricas`, `/demo/*`) no se publican; se usan con `docker compose exec`.
+## Decisiones adoptadas
+
+| Tema | Decision | Por que |
+|---|---|---|
+| Autenticacion | Token Bearer estatico por cliente (`GATEWAY_TOKENS`), no JWT | El enunciado pide que el gateway valide un token en la entrada; no exige JWT. Se verifico: sin token o con token invalido responde 401. |
+| Rate limit | 60 peticiones por minuto por cliente (`RATE_LIMIT_PER_MINUTE`) | Valor por defecto del gateway; supera la carga normal de una demo. Los experimentos lo suben a 5000. Se verifico el 429 con `Retry-After`. |
+| Timeouts del gateway | 10 s en POST y 4 s en GET | La saga hace hasta tres pasos mas compensaciones (unos 0,9 s sin fallas); el BFF espera como maximo 2 s por fuente. |
+| Puertos | Gateway 8080 (unico publicado) y BFF 8005 (interno) | Cumple "solo el gateway se expone". Se verifico que los puertos internos no responden desde el host. |
+| Timeout del BFF | `BFF_TIMEOUT` de 2,0 s por fuente | Con una fuente caida el resumen responde en unos 2 s, degradado. |
+| Resumen del BFF | Agrega saga, habitaciones y confirmaciones; no incluye Pagos | Cumple "agregar al menos dos servicios" y sigue funcionando con Pagos caido (verificado deteniendo Pagos). |
+| Destino no disponible | El gateway responde 503 (y 504 si vence el timeout), no 502 | El 502 queda reservado para la saga `COMPENSADA`, asi no se confunden. |
+| Endpoints de demo | `/chaos`, `/metricas` y `/demo/*` no se publican; se usan con `docker compose exec` | Provocar fallas no debe estar disponible desde el exterior. Los experimentos funcionan asi. |

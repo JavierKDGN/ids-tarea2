@@ -31,7 +31,7 @@ info:
     Idempotencia: la clave es `id_pago`. Misma clave con otro `id_reserva` o `monto` -> 409.
 
     `x-estado`: `implementado` | `ajustar` | `nuevo`. Ajuste global pendiente: formato de error `Error`
-    (hoy `{"detail": ...}`) y registrar `X-Correlation-ID` en los logs de estado de pago.
+    (hoy `{"detail": ...}`). El `X-Correlation-ID` ya se registra en los logs de cada request.
 servers:
   - url: http://pagos:8002
     description: Red interna de Docker Compose
@@ -186,10 +186,7 @@ paths:
       description: |
         Idempotente: si ya esta `REEMBOLSADO` responde 200 sin nuevos efectos. Solo se reembolsa un pago `COBRADO`;
         en cualquier otro estado responde 409 (reembolso inseguro).
-      x-estado: ajustar
-      x-ajuste: |
-        Hoy `respuesta.raise_for_status()` lanza `httpx.HTTPStatusError`, que no se captura (solo `RequestError`),
-        y termina en 500. Debe responder 502 `PASARELA_NO_CONFIRMO` cuando la pasarela contesta con error HTTP.
+      x-estado: implementado
       parameters:
         - $ref: '#/components/parameters/IdPagoPath'
         - $ref: './common.yaml#/components/parameters/XCorrelationID'

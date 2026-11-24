@@ -17,8 +17,8 @@ info:
 
     Estado por operacion: `x-estado` = `implementado` (coincide con el codigo actual),
     `ajustar` (existe, requiere cambio; ver `x-ajuste`) o `nuevo` (aun no existe).
-    Ajuste global pendiente: formato de error `Error` y registro de `X-Correlation-ID` en logs
-    (este servicio hoy no tiene logging).
+    Ajuste global pendiente: formato de error `Error` (hoy `{"detail": ...}`). El registro de `X-Correlation-ID`
+    en logs ya esta hecho (modulo `src/common/correlacion.py`).
 servers:
   - url: http://habitaciones:8001
     description: Red interna de Docker Compose

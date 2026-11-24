@@ -191,7 +191,10 @@ def reembolsar(id_pago: str, x_correlation_id: str | None = Header(default=None)
                                     headers={"X-Correlation-ID": x_correlation_id or actual["id_reserva"]})
         respuesta.raise_for_status()
         if respuesta.json().get("estado") != "REEMBOLSADO":
-            raise HTTPException(502, "La pasarela no confirmo reembolso")
+            raise HTTPException(502, "PASARELA_NO_CONFIRMO: la pasarela no confirmo reembolso")
+    except httpx.HTTPStatusError as exc:
+        log.error("evento=reembolso_rechazado pago=%s estado_http=%s", id_pago, exc.response.status_code)
+        raise HTTPException(502, "PASARELA_NO_CONFIRMO: la pasarela respondio con error al reembolsar")
     except httpx.RequestError as exc:
         log.error("evento=reembolso_pendiente pago=%s razon=%s", id_pago, exc)
         raise HTTPException(503, "Reembolso pendiente; reintentar la compensacion")

@@ -15,11 +15,11 @@ info:
     - Las tres llamadas salen **en paralelo**, cada una con timeout (`BFF_TIMEOUT`, propuesta 2.0 s).
     - Degradacion elegante: la Saga es la fuente obligatoria. Si Habitaciones o Confirmaciones fallan, responde 200
       con esa seccion en `null`, `degradado: true` y la causa en `fuentes`.
-    - Tolerancia: mientras `GET /reservas/{id}` de la Saga no responda 200 para estados terminales, el BFF debe
-      aceptar tambien 202/409/502 cuando el cuerpo sea `ReservaSaga`.
+    - Tolerancia: la Saga ya responde 200 en `GET /reservas/{id}`; el BFF igual acepta 202/409/502 cuando el cuerpo
+      sea `ReservaSaga`, por robustez.
 
-    `x-estado`: **nuevo** (no existe aun). El `bff/main.py` actual es una version antigua que duplica la
-    orquestacion, no compensa y falla al serializar fechas; debe reemplazarse, y `bff/saga.py` eliminarse.
+    `x-estado`: **implementado** (`src/servicios/bff/main.py`). Reemplaza al BFF antiguo, que duplicaba la
+    orquestacion; `bff/saga.py` se elimino.
 servers:
   - url: http://bff:8005
     description: Red interna de Docker Compose 
@@ -32,7 +32,7 @@ paths:
       tags: [Vistas]
       operationId: bff_resumen_reserva
       summary: Vista agregada de una reserva
-      x-estado: nuevo
+      x-estado: implementado
       x-fuentes:
         - 'saga: GET /reservas/{id_reserva}  (obligatoria)'
         - 'habitaciones: GET /reservas/{id_reserva}'
@@ -113,7 +113,7 @@ paths:
       tags: [Operacion]
       operationId: bff_health
       summary: Healthcheck
-      x-estado: nuevo
+      x-estado: implementado
       responses:
         '200':
           description: Servicio operativo.
