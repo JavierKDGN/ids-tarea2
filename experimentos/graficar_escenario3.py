@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 AQUI = Path(__file__).resolve().parent
 RESUMEN = AQUI.parent / "evidence" / "docker" / "escenario3_resumen.json"
 ETIQUETAS = {"A_con_patrones": "A: con patrones", "B_sin_breaker_ni_bulkhead": "B: sin breaker ni bulkhead",
-             "C_sin_ningun_patron": "C: sin ningun patron"}
+             "C_sin_ningun_patron": "C: sin breaker, bulkhead ni timeout corto"}
 COLORES = {"A_con_patrones": "#2a9d8f", "B_sin_breaker_ni_bulkhead": "#e9c46a", "C_sin_ningun_patron": "#e76f51"}
 ESTADOS = ["RECHAZADO", "INCIERTO", "COBRADO"]
 COLOR_ESTADO = {"RECHAZADO": "#2a9d8f", "INCIERTO": "#e9c46a", "COBRADO": "#e76f51"}
