@@ -13,17 +13,17 @@ from utils import (ROOT, compose, gateway, guardar, habitacion_unica, interno, n
 CONFIGURACIONES = {
     "A_con_patrones": {
         "descripcion": "Timeout 1 s + Circuit Breaker (umbral 2) + Bulkhead (2)",
-        "env": {"RATE_LIMIT_PER_MINUTE": "5000", "PASARELA_TIMEOUT": "1.0",
+        "env": {"RATE_LIMIT_PER_MINUTE": "5000", "RECONCILIACION_SEGUNDOS": "0", "PASARELA_TIMEOUT": "1.0",
                 "CB_FAILURE_THRESHOLD": "2", "CB_RECOVERY_SECONDS": "4", "BULKHEAD_MAX_CONCURRENT": "2"},
     },
     "B_sin_breaker_ni_bulkhead": {
         "descripcion": "Solo timeout 1 s; Circuit Breaker y Bulkhead neutralizados",
-        "env": {"RATE_LIMIT_PER_MINUTE": "5000", "PASARELA_TIMEOUT": "1.0",
+        "env": {"RATE_LIMIT_PER_MINUTE": "5000", "RECONCILIACION_SEGUNDOS": "0", "PASARELA_TIMEOUT": "1.0",
                 "CB_FAILURE_THRESHOLD": "100000", "CB_RECOVERY_SECONDS": "4", "BULKHEAD_MAX_CONCURRENT": "1000"},
     },
     "C_sin_ningun_patron": {
         "descripcion": "Sin Circuit Breaker, sin Bulkhead y con timeout de 30 s hacia la pasarela",
-        "env": {"RATE_LIMIT_PER_MINUTE": "5000", "PASARELA_TIMEOUT": "30",
+        "env": {"RATE_LIMIT_PER_MINUTE": "5000", "RECONCILIACION_SEGUNDOS": "0", "PASARELA_TIMEOUT": "30",
                 "CB_FAILURE_THRESHOLD": "100000", "CB_RECOVERY_SECONDS": "4", "BULKHEAD_MAX_CONCURRENT": "1000"},
     },
 }

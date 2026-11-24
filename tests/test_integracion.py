@@ -204,3 +204,54 @@ def test_errores_usan_el_formato_del_contrato(server):
     reutilizada = crear(server, "err-a", habitacion=40, monto="999.00")
     assert reutilizada.status_code == 409
     assert reutilizada.json()["code"] == "IDEMPOTENCY_CONFLICT"
+
+
+def test_saga_reconcilia_sola_un_cobro_tardio(server, tmp_path):
+    chaos(server)
+    puerto = puerto_libre()
+    env = os.environ.copy()
+    env.update({
+        "PYTHONPATH": str(ROOT), "SAGA_DB": str(tmp_path / "saga_auto.db"),
+        "HABITACIONES_URL": server["habitaciones"], "PAGOS_URL": server["pagos"],
+        "CONFIRMACION_URL": server["confirmaciones"], "SERVICES_TIMEOUT": "2.0",
+        "RECONCILIACION_SEGUNDOS": "1",
+    })
+    log = open(tmp_path / "saga_auto.log", "w")
+    proceso = subprocess.Popen(
+        [sys.executable, "-m", "uvicorn", "src.servicios.saga.main:app", "--host", "127.0.0.1",
+         "--port", str(puerto), "--no-access-log"], cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT)
+    base = f"http://127.0.0.1:{puerto}"
+    try:
+        for _ in range(150):
+            try:
+                if httpx.get(base + "/health", timeout=0.3).status_code == 200:
+                    break
+            except httpx.RequestError:
+                pass
+            time.sleep(0.1)
+        else:
+            raise RuntimeError("No arranco la saga con reconciliacion")
+        httpx.post(server["pasarela"] + "/chaos", json={"latencia_segundos": 1.5, "forzar_error": False})
+        rid = "auto-" + uuid.uuid4().hex[:8]
+        r = httpx.post(base + "/reservas", json={
+            "id_reserva": rid, "habitacion_id": 50, "fecha_inicio": "2027-05-01",
+            "fecha_fin": "2027-05-03", "monto": "80.00"}, headers={"Idempotency-Key": rid}, timeout=8)
+        assert r.json()["estado"] == "PENDIENTE_PAGO", r.text
+        httpx.post(server["pasarela"] + "/chaos", json={"latencia_segundos": 0, "forzar_error": False})
+        estado = None
+        for _ in range(60):
+            estado = httpx.get(f"{base}/reservas/{rid}").json()["estado"]
+            if estado == "COMPENSADA":
+                break
+            time.sleep(0.5)
+        assert estado == "COMPENSADA", estado
+        assert httpx.get(f"{server['pagos']}/pagos/pay-{rid}").json()["estado"] == "REEMBOLSADO"
+        assert httpx.get(f"{server['habitaciones']}/reservas/{rid}").json()["estado"] == "LIBERADA"
+    finally:
+        proceso.terminate()
+        try:
+            proceso.wait(timeout=4)
+        except subprocess.TimeoutExpired:
+            proceso.kill()
+        log.close()
+        chaos(server)

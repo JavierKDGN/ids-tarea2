@@ -72,6 +72,7 @@ services:
       PAGOS_URL: http://pagos:8002
       CONFIRMACION_URL: http://confirmaciones:8003
       SERVICES_TIMEOUT: ${SERVICES_TIMEOUT:-2.5}
+      RECONCILIACION_SEGUNDOS: ${RECONCILIACION_SEGUNDOS:-20}
     volumes: [saga-data:/data]
     depends_on:
       habitaciones: {condition: service_healthy}

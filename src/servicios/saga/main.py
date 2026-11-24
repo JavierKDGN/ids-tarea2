@@ -1,6 +1,8 @@
 """API publica temporal del orquestador (sin Gateway/BFF aun)."""
 import logging
+import os
 import re
+from contextlib import asynccontextmanager
 from datetime import date
 from decimal import Decimal
 
@@ -10,10 +12,21 @@ from pydantic import BaseModel, Field, model_validator
 
 from src.common.correlacion import instalar
 from src.common.errores import instalar_errores
-from .logic import ContratoInvalido, consultar, ejecutar, registrar
+from .logic import ContratoInvalido, consultar, ejecutar, iniciar_reconciliador, registrar
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
-app = FastAPI(title="Saga-orquestada")
+INTERVALO_RECONCILIACION_S = float(os.getenv("RECONCILIACION_SEGUNDOS", "0"))
+
+
+@asynccontextmanager
+async def ciclo_de_vida(app):
+    detener = iniciar_reconciliador(INTERVALO_RECONCILIACION_S)
+    yield
+    if detener:
+        detener.set()
+
+
+app = FastAPI(title="Saga-orquestada", lifespan=ciclo_de_vida)
 instalar(app, "saga")
 instalar_errores(app)
 

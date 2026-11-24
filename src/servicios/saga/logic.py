@@ -9,7 +9,7 @@ import sqlite3
 import threading
 import uuid
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import httpx
@@ -288,6 +288,36 @@ def avanzar(s):
     except Exception as exc:
         log.exception("evento=error_inesperado_saga reserva=%s", rid)
         cambiar(rid, "PENDIENTE_COMPENSACION" if s["estado"] in ("COMPENSANDO", "PENDIENTE_COMPENSACION") else "PENDIENTE_VERIFICACION", str(exc))
+
+ESTADOS_FINALES = ("CONFIRMADA", "COMPENSADA", "FALLIDA")
+
+def pendientes(antiguedad_s):
+    limite = (datetime.now(timezone.utc) - timedelta(seconds=antiguedad_s)).isoformat()
+    with db() as conn:
+        filas = conn.execute(
+            "SELECT id_reserva FROM sagas WHERE estado NOT IN (?, ?, ?) AND actualizado < ?",
+            (*ESTADOS_FINALES, limite)).fetchall()
+    return [f["id_reserva"] for f in filas]
+
+def reconciliar_pendientes(antiguedad_s):
+    for rid in pendientes(antiguedad_s):
+        if ejecutar(rid):
+            log.info("evento=reconciliacion_automatica reserva=%s estado=%s", rid, consultar(id_reserva=rid)["estado"])
+
+def iniciar_reconciliador(intervalo_s):
+    if intervalo_s <= 0:
+        return None
+    detener = threading.Event()
+
+    def bucle():
+        while not detener.wait(intervalo_s):
+            try:
+                reconciliar_pendientes(intervalo_s)
+            except Exception:
+                log.exception("evento=reconciliacion_error")
+
+    threading.Thread(target=bucle, daemon=True, name="reconciliador").start()
+    return detener
 
 def ejecutar(id_reserva):
     with _guard:
