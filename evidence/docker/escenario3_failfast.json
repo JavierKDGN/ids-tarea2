@@ -1,0 +1,70 @@
+{
+  "descripcion": "Llamadas secuenciales a POST /pagos con la pasarela respondiendo en 6 s y timeout de 1 s; el Circuit Breaker abre tras 2 fallos",
+  "llamadas": [
+    {
+      "llamada": 1,
+      "ms": 1195.2,
+      "http": 202,
+      "estado": "INCIERTO",
+      "fallback": null
+    },
+    {
+      "llamada": 2,
+      "ms": 1052.1,
+      "http": 202,
+      "estado": "INCIERTO",
+      "fallback": null
+    },
+    {
+      "llamada": 3,
+      "ms": 24.7,
+      "http": 503,
+      "estado": "RECHAZADO",
+      "fallback": "Pago no disponible, NO cobrado"
+    },
+    {
+      "llamada": 4,
+      "ms": 24.0,
+      "http": 503,
+      "estado": "RECHAZADO",
+      "fallback": "Pago no disponible, NO cobrado"
+    },
+    {
+      "llamada": 5,
+      "ms": 22.3,
+      "http": 503,
+      "estado": "RECHAZADO",
+      "fallback": "Pago no disponible, NO cobrado"
+    },
+    {
+      "llamada": 6,
+      "ms": 27.1,
+      "http": 503,
+      "estado": "RECHAZADO",
+      "fallback": "Pago no disponible, NO cobrado"
+    }
+  ],
+  "metricas": {
+    "circuit_breaker": "OPEN",
+    "latencia_pasarela_ms": {
+      "n": 2,
+      "media": 1078.7,
+      "p50": 1078.7,
+      "p95": 1125.1,
+      "max": 1130.3
+    },
+    "fallos_consecutivos": 2,
+    "bulkhead_en_uso": 0,
+    "bulkhead_capacidad": 10,
+    "umbral": 2,
+    "llamadas_pasarela": 2,
+    "exitos": 0,
+    "fallos": 2,
+    "timeouts": 2,
+    "rechazos_circuito": 4,
+    "rechazos_bulkhead": 0,
+    "fallbacks": 4,
+    "transiciones_open": 1,
+    "reintentos": 0
+  }
+}
