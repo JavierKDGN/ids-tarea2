@@ -19,7 +19,7 @@ class Resiliencia:
     def __init__(self):
         self.umbral = max(1, int(os.getenv("CB_FAILURE_THRESHOLD", "2")))
         self.recuperacion_s = float(os.getenv("CB_RECOVERY_SECONDS", "4"))
-        self.capacidad = max(1, int(os.getenv("BULKHEAD_MAX_CONCURRENT", "2")))
+        self.capacidad = max(1, int(os.getenv("BULKHEAD_MAX_CONCURRENT", "10")))
         self._lock = threading.Lock()
         self._semaforo = threading.BoundedSemaphore(self.capacidad)
         self.reiniciar()

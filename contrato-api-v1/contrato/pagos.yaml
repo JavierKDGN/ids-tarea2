@@ -23,7 +23,7 @@ info:
     - **Circuit Breaker**: `CB_FAILURE_THRESHOLD` (def. 2 fallos consecutivos) y `CB_RECOVERY_SECONDS` (def. 4 s).
       Estados `CLOSED -> OPEN -> HALF_OPEN -> CLOSED`; en HALF_OPEN pasa una sola llamada de prueba.
       Abierto: falla en milisegundos con fallback `RECHAZADO` ("Pago no disponible, NO cobrado").
-    - **Bulkhead**: `BULKHEAD_MAX_CONCURRENT` (def. 2) llamadas simultaneas a la pasarela; el exceso se rechaza
+    - **Bulkhead**: `BULKHEAD_MAX_CONCURRENT` (def. 10) llamadas simultaneas a la pasarela; el exceso se rechaza
       de inmediato con `RECHAZADO`.
     - El **reembolso** queda fuera del Circuit Breaker a proposito (para no bloquear compensaciones criticas),
       pero conserva timeout e idempotencia.

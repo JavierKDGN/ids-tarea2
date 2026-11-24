@@ -45,7 +45,7 @@ services:
       PASARELA_TIMEOUT: ${PASARELA_TIMEOUT:-1.0}
       CB_FAILURE_THRESHOLD: ${CB_FAILURE_THRESHOLD:-2}
       CB_RECOVERY_SECONDS: ${CB_RECOVERY_SECONDS:-4}
-      BULKHEAD_MAX_CONCURRENT: ${BULKHEAD_MAX_CONCURRENT:-2}
+      BULKHEAD_MAX_CONCURRENT: ${BULKHEAD_MAX_CONCURRENT:-10}
     volumes: [pagos-data:/data]
     depends_on:
       pasarela: {condition: service_healthy}
