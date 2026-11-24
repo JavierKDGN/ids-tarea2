@@ -1,0 +1,90 @@
+{
+  "id_reserva": "feliz-5e5c6a3a",
+  "correlation_id": "esc1-92ba7c98",
+  "respuesta": {
+    "http": 201,
+    "duracion_s": 0.851,
+    "datos": {
+      "id_reserva": "feliz-5e5c6a3a",
+      "id_pago": "pay-feliz-5e5c6a3a",
+      "id_voucher": "voucher-feliz-5e5c6a3a",
+      "estado": "CONFIRMADA",
+      "error": null,
+      "actualizado": "2026-11-24T00:31:21.391222+00:00"
+    }
+  },
+  "reintento_idempotente": {
+    "http": 200,
+    "duracion_s": 0.542,
+    "datos": {
+      "id_reserva": "feliz-5e5c6a3a",
+      "id_pago": "pay-feliz-5e5c6a3a",
+      "id_voucher": "voucher-feliz-5e5c6a3a",
+      "estado": "CONFIRMADA",
+      "error": null,
+      "actualizado": "2026-11-24T00:31:21.391222+00:00"
+    }
+  },
+  "resumen_bff": {
+    "http": 200,
+    "duracion_s": 0.578,
+    "datos": {
+      "id_reserva": "feliz-5e5c6a3a",
+      "mensaje": "Reserva confirmada",
+      "degradado": false,
+      "saga": {
+        "estado": "CONFIRMADA",
+        "error": null,
+        "actualizado": "2026-11-24T00:31:21.391222+00:00"
+      },
+      "habitacion": {
+        "habitacion_id": 782764,
+        "fecha_inicio": "2027-03-01",
+        "fecha_fin": "2027-03-04",
+        "estado": "RESERVADA"
+      },
+      "confirmacion": {
+        "id_voucher": "voucher-feliz-5e5c6a3a",
+        "estado": "EMITIDO",
+        "fecha_emision": "2026-11-24T00:31:21.380538+00:00"
+      },
+      "fuentes": {
+        "saga": "OK",
+        "habitacion": "OK",
+        "confirmacion": "OK"
+      },
+      "generado": "2026-11-24T00:31:22.535434+00:00"
+    }
+  },
+  "estados": {
+    "habitacion": {
+      "http": 200,
+      "datos": {
+        "id_reserva": "feliz-5e5c6a3a",
+        "habitacion_id": 782764,
+        "fecha_inicio": "2027-03-01",
+        "fecha_fin": "2027-03-04",
+        "estado": "RESERVADA"
+      }
+    },
+    "pago": {
+      "http": 200,
+      "datos": {
+        "id_pago": "pay-feliz-5e5c6a3a",
+        "id_reserva": "feliz-5e5c6a3a",
+        "monto_centavos": 8000,
+        "estado": "COBRADO",
+        "monto": "80.00"
+      }
+    },
+    "confirmacion": {
+      "http": 200,
+      "datos": {
+        "id_voucher": "voucher-feliz-5e5c6a3a",
+        "id_reserva": "feliz-5e5c6a3a",
+        "estado": "EMITIDO",
+        "fecha_emision": "2026-11-24T00:31:21.380538+00:00"
+      }
+    }
+  }
+}

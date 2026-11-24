@@ -1,0 +1,168 @@
+{
+  "configuracion": "A_con_patrones",
+  "descripcion": "Timeout 1 s + Circuit Breaker (umbral 2) + Bulkhead (2)",
+  "env": {
+    "RATE_LIMIT_PER_MINUTE": "5000",
+    "PASARELA_TIMEOUT": "1.0",
+    "CB_FAILURE_THRESHOLD": "2",
+    "CB_RECOVERY_SECONDS": "4",
+    "BULKHEAD_MAX_CONCURRENT": "2"
+  },
+  "base": {
+    "latencias": {
+      "n": 5,
+      "p50": 0.655,
+      "p95": 0.791,
+      "max": 0.822,
+      "media": 0.685
+    },
+    "estados": {
+      "CONFIRMADA": 5
+    },
+    "metricas": {
+      "circuit_breaker": "CLOSED",
+      "fallos_consecutivos": 0,
+      "bulkhead_en_uso": 0,
+      "bulkhead_capacidad": 2,
+      "umbral": 2,
+      "llamadas_pasarela": 5,
+      "exitos": 5,
+      "fallos": 0,
+      "timeouts": 0,
+      "rechazos_circuito": 0,
+      "rechazos_bulkhead": 0,
+      "fallbacks": 0,
+      "transiciones_open": 0
+    }
+  },
+  "lentitud_concurrente": {
+    "latencia_pasarela_s": 6,
+    "reservas_concurrentes": 50,
+    "tiempo_total_s": 9.571,
+    "latencias": {
+      "n": 50,
+      "p50": 8.175,
+      "p95": 9.163,
+      "max": 9.555,
+      "media": 8.117
+    },
+    "estados": {
+      "COMPENSADA": 47,
+      "PENDIENTE_PAGO": 3
+    },
+    "metricas": {
+      "circuit_breaker": "OPEN",
+      "fallos_consecutivos": 3,
+      "bulkhead_en_uso": 0,
+      "bulkhead_capacidad": 2,
+      "umbral": 2,
+      "llamadas_pasarela": 3,
+      "exitos": 0,
+      "fallos": 3,
+      "timeouts": 3,
+      "rechazos_circuito": 44,
+      "rechazos_bulkhead": 3,
+      "fallbacks": 47,
+      "transiciones_open": 2
+    },
+    "sondas": {
+      "disponibilidad_via_gateway": {
+        "n": 9,
+        "p50": 0.591,
+        "p95": 3.955,
+        "max": 6.141,
+        "media": 1.211
+      },
+      "resumen_bff_via_gateway": {
+        "n": 8,
+        "p50": 0.64,
+        "p95": 4.989,
+        "max": 7.272,
+        "media": 1.473
+      },
+      "pagos_interno": {
+        "n": 129,
+        "p50": 0.006,
+        "p95": 0.011,
+        "max": 0.12,
+        "media": 0.008
+      }
+    },
+    "pagos_tras_drenar": {
+      "RECHAZADO": 47,
+      "INCIERTO": 3
+    },
+    "saga_tras_drenar": {
+      "COMPENSADA": 47,
+      "PENDIENTE_PAGO": 3
+    }
+  },
+  "caida": {
+    "reservas_secuenciales": 12,
+    "latencias": {
+      "n": 12,
+      "p50": 0.647,
+      "p95": 0.729,
+      "max": 0.734,
+      "media": 0.657
+    },
+    "estados": {
+      "COMPENSADA": 12
+    },
+    "llamadas_que_llegaron_a_la_pasarela": 3,
+    "metricas": {
+      "circuit_breaker": "OPEN",
+      "fallos_consecutivos": 3,
+      "bulkhead_en_uso": 0,
+      "bulkhead_capacidad": 2,
+      "umbral": 2,
+      "llamadas_pasarela": 3,
+      "exitos": 0,
+      "fallos": 3,
+      "timeouts": 0,
+      "rechazos_circuito": 9,
+      "rechazos_bulkhead": 0,
+      "fallbacks": 9,
+      "transiciones_open": 2
+    },
+    "latencia_por_intento_s": [
+      0.676,
+      0.682,
+      0.621,
+      0.676,
+      0.635,
+      0.619,
+      0.725,
+      0.734,
+      0.608,
+      0.66,
+      0.622,
+      0.624
+    ]
+  },
+  "recuperacion": {
+    "intento": {
+      "i": 0,
+      "id_reserva": "recup-A-0-8f39f65d",
+      "t_inicio_s": 1795481262.400519,
+      "duracion_s": 0.664,
+      "http": 201,
+      "estado": "CONFIRMADA"
+    },
+    "metricas": {
+      "circuit_breaker": "CLOSED",
+      "fallos_consecutivos": 0,
+      "bulkhead_en_uso": 0,
+      "bulkhead_capacidad": 2,
+      "umbral": 2,
+      "llamadas_pasarela": 4,
+      "exitos": 1,
+      "fallos": 3,
+      "timeouts": 0,
+      "rechazos_circuito": 9,
+      "rechazos_bulkhead": 0,
+      "fallbacks": 9,
+      "transiciones_open": 2
+    }
+  }
+}

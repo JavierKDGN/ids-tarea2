@@ -1,0 +1,500 @@
+{
+  "A_con_patrones": {
+    "configuracion": "A_con_patrones",
+    "descripcion": "Timeout 1 s + Circuit Breaker (umbral 2) + Bulkhead (2)",
+    "env": {
+      "RATE_LIMIT_PER_MINUTE": "5000",
+      "PASARELA_TIMEOUT": "1.0",
+      "CB_FAILURE_THRESHOLD": "2",
+      "CB_RECOVERY_SECONDS": "4",
+      "BULKHEAD_MAX_CONCURRENT": "2"
+    },
+    "base": {
+      "latencias": {
+        "n": 5,
+        "p50": 0.655,
+        "p95": 0.791,
+        "max": 0.822,
+        "media": 0.685
+      },
+      "estados": {
+        "CONFIRMADA": 5
+      },
+      "metricas": {
+        "circuit_breaker": "CLOSED",
+        "fallos_consecutivos": 0,
+        "bulkhead_en_uso": 0,
+        "bulkhead_capacidad": 2,
+        "umbral": 2,
+        "llamadas_pasarela": 5,
+        "exitos": 5,
+        "fallos": 0,
+        "timeouts": 0,
+        "rechazos_circuito": 0,
+        "rechazos_bulkhead": 0,
+        "fallbacks": 0,
+        "transiciones_open": 0
+      }
+    },
+    "lentitud_concurrente": {
+      "latencia_pasarela_s": 6,
+      "reservas_concurrentes": 50,
+      "tiempo_total_s": 9.571,
+      "latencias": {
+        "n": 50,
+        "p50": 8.175,
+        "p95": 9.163,
+        "max": 9.555,
+        "media": 8.117
+      },
+      "estados": {
+        "COMPENSADA": 47,
+        "PENDIENTE_PAGO": 3
+      },
+      "metricas": {
+        "circuit_breaker": "OPEN",
+        "fallos_consecutivos": 3,
+        "bulkhead_en_uso": 0,
+        "bulkhead_capacidad": 2,
+        "umbral": 2,
+        "llamadas_pasarela": 3,
+        "exitos": 0,
+        "fallos": 3,
+        "timeouts": 3,
+        "rechazos_circuito": 44,
+        "rechazos_bulkhead": 3,
+        "fallbacks": 47,
+        "transiciones_open": 2
+      },
+      "sondas": {
+        "disponibilidad_via_gateway": {
+          "n": 9,
+          "p50": 0.591,
+          "p95": 3.955,
+          "max": 6.141,
+          "media": 1.211
+        },
+        "resumen_bff_via_gateway": {
+          "n": 8,
+          "p50": 0.64,
+          "p95": 4.989,
+          "max": 7.272,
+          "media": 1.473
+        },
+        "pagos_interno": {
+          "n": 129,
+          "p50": 0.006,
+          "p95": 0.011,
+          "max": 0.12,
+          "media": 0.008
+        }
+      },
+      "pagos_tras_drenar": {
+        "RECHAZADO": 47,
+        "INCIERTO": 3
+      },
+      "saga_tras_drenar": {
+        "COMPENSADA": 47,
+        "PENDIENTE_PAGO": 3
+      }
+    },
+    "caida": {
+      "reservas_secuenciales": 12,
+      "latencias": {
+        "n": 12,
+        "p50": 0.647,
+        "p95": 0.729,
+        "max": 0.734,
+        "media": 0.657
+      },
+      "estados": {
+        "COMPENSADA": 12
+      },
+      "llamadas_que_llegaron_a_la_pasarela": 3,
+      "metricas": {
+        "circuit_breaker": "OPEN",
+        "fallos_consecutivos": 3,
+        "bulkhead_en_uso": 0,
+        "bulkhead_capacidad": 2,
+        "umbral": 2,
+        "llamadas_pasarela": 3,
+        "exitos": 0,
+        "fallos": 3,
+        "timeouts": 0,
+        "rechazos_circuito": 9,
+        "rechazos_bulkhead": 0,
+        "fallbacks": 9,
+        "transiciones_open": 2
+      },
+      "latencia_por_intento_s": [
+        0.676,
+        0.682,
+        0.621,
+        0.676,
+        0.635,
+        0.619,
+        0.725,
+        0.734,
+        0.608,
+        0.66,
+        0.622,
+        0.624
+      ]
+    },
+    "recuperacion": {
+      "intento": {
+        "i": 0,
+        "id_reserva": "recup-A-0-8f39f65d",
+        "t_inicio_s": 1795481262.400519,
+        "duracion_s": 0.664,
+        "http": 201,
+        "estado": "CONFIRMADA"
+      },
+      "metricas": {
+        "circuit_breaker": "CLOSED",
+        "fallos_consecutivos": 0,
+        "bulkhead_en_uso": 0,
+        "bulkhead_capacidad": 2,
+        "umbral": 2,
+        "llamadas_pasarela": 4,
+        "exitos": 1,
+        "fallos": 3,
+        "timeouts": 0,
+        "rechazos_circuito": 9,
+        "rechazos_bulkhead": 0,
+        "fallbacks": 9,
+        "transiciones_open": 2
+      }
+    }
+  },
+  "B_sin_breaker_ni_bulkhead": {
+    "configuracion": "B_sin_breaker_ni_bulkhead",
+    "descripcion": "Solo timeout 1 s; Circuit Breaker y Bulkhead neutralizados",
+    "env": {
+      "RATE_LIMIT_PER_MINUTE": "5000",
+      "PASARELA_TIMEOUT": "1.0",
+      "CB_FAILURE_THRESHOLD": "100000",
+      "CB_RECOVERY_SECONDS": "4",
+      "BULKHEAD_MAX_CONCURRENT": "1000"
+    },
+    "base": {
+      "latencias": {
+        "n": 5,
+        "p50": 0.661,
+        "p95": 0.81,
+        "max": 0.845,
+        "media": 0.696
+      },
+      "estados": {
+        "CONFIRMADA": 5
+      },
+      "metricas": {
+        "circuit_breaker": "CLOSED",
+        "fallos_consecutivos": 0,
+        "bulkhead_en_uso": 0,
+        "bulkhead_capacidad": 1000,
+        "umbral": 100000,
+        "llamadas_pasarela": 5,
+        "exitos": 5,
+        "fallos": 0,
+        "timeouts": 0,
+        "rechazos_circuito": 0,
+        "rechazos_bulkhead": 0,
+        "fallbacks": 0,
+        "transiciones_open": 0
+      }
+    },
+    "lentitud_concurrente": {
+      "latencia_pasarela_s": 6,
+      "reservas_concurrentes": 50,
+      "tiempo_total_s": 9.413,
+      "latencias": {
+        "n": 50,
+        "p50": 8.104,
+        "p95": 8.94,
+        "max": 9.396,
+        "media": 8.061
+      },
+      "estados": {
+        "PENDIENTE_PAGO": 50
+      },
+      "metricas": {
+        "circuit_breaker": "CLOSED",
+        "fallos_consecutivos": 50,
+        "bulkhead_en_uso": 0,
+        "bulkhead_capacidad": 1000,
+        "umbral": 100000,
+        "llamadas_pasarela": 50,
+        "exitos": 0,
+        "fallos": 50,
+        "timeouts": 50,
+        "rechazos_circuito": 0,
+        "rechazos_bulkhead": 0,
+        "fallbacks": 0,
+        "transiciones_open": 0
+      },
+      "sondas": {
+        "disponibilidad_via_gateway": {
+          "n": 9,
+          "p50": 0.591,
+          "p95": 3.924,
+          "max": 6.102,
+          "media": 1.202
+        },
+        "resumen_bff_via_gateway": {
+          "n": 7,
+          "p50": 0.726,
+          "p95": 5.407,
+          "max": 7.405,
+          "media": 1.632
+        },
+        "pagos_interno": {
+          "n": 129,
+          "p50": 0.005,
+          "p95": 0.012,
+          "max": 0.078,
+          "media": 0.007
+        }
+      },
+      "pagos_tras_drenar": {
+        "INCIERTO": 50
+      },
+      "saga_tras_drenar": {
+        "PENDIENTE_PAGO": 50
+      }
+    },
+    "caida": {
+      "reservas_secuenciales": 12,
+      "latencias": {
+        "n": 12,
+        "p50": 0.658,
+        "p95": 0.69,
+        "max": 0.692,
+        "media": 0.661
+      },
+      "estados": {
+        "COMPENSADA": 12
+      },
+      "llamadas_que_llegaron_a_la_pasarela": 12,
+      "metricas": {
+        "circuit_breaker": "CLOSED",
+        "fallos_consecutivos": 12,
+        "bulkhead_en_uso": 0,
+        "bulkhead_capacidad": 1000,
+        "umbral": 100000,
+        "llamadas_pasarela": 12,
+        "exitos": 0,
+        "fallos": 12,
+        "timeouts": 0,
+        "rechazos_circuito": 0,
+        "rechazos_bulkhead": 0,
+        "fallbacks": 0,
+        "transiciones_open": 0
+      },
+      "latencia_por_intento_s": [
+        0.66,
+        0.656,
+        0.646,
+        0.635,
+        0.692,
+        0.655,
+        0.663,
+        0.689,
+        0.652,
+        0.683,
+        0.672,
+        0.635
+      ]
+    },
+    "recuperacion": {
+      "intento": {
+        "i": 0,
+        "id_reserva": "recup-B-0-e7b4c251",
+        "t_inicio_s": 1795481402.9686773,
+        "duracion_s": 0.649,
+        "http": 201,
+        "estado": "CONFIRMADA"
+      },
+      "metricas": {
+        "circuit_breaker": "CLOSED",
+        "fallos_consecutivos": 0,
+        "bulkhead_en_uso": 0,
+        "bulkhead_capacidad": 1000,
+        "umbral": 100000,
+        "llamadas_pasarela": 13,
+        "exitos": 1,
+        "fallos": 12,
+        "timeouts": 0,
+        "rechazos_circuito": 0,
+        "rechazos_bulkhead": 0,
+        "fallbacks": 0,
+        "transiciones_open": 0
+      }
+    }
+  },
+  "C_sin_ningun_patron": {
+    "configuracion": "C_sin_ningun_patron",
+    "descripcion": "Sin Circuit Breaker, sin Bulkhead y con timeout de 30 s hacia la pasarela",
+    "env": {
+      "RATE_LIMIT_PER_MINUTE": "5000",
+      "PASARELA_TIMEOUT": "30",
+      "CB_FAILURE_THRESHOLD": "100000",
+      "CB_RECOVERY_SECONDS": "4",
+      "BULKHEAD_MAX_CONCURRENT": "1000"
+    },
+    "base": {
+      "latencias": {
+        "n": 5,
+        "p50": 0.656,
+        "p95": 0.79,
+        "max": 0.822,
+        "media": 0.685
+      },
+      "estados": {
+        "CONFIRMADA": 5
+      },
+      "metricas": {
+        "circuit_breaker": "CLOSED",
+        "fallos_consecutivos": 0,
+        "bulkhead_en_uso": 0,
+        "bulkhead_capacidad": 1000,
+        "umbral": 100000,
+        "llamadas_pasarela": 5,
+        "exitos": 5,
+        "fallos": 0,
+        "timeouts": 0,
+        "rechazos_circuito": 0,
+        "rechazos_bulkhead": 0,
+        "fallbacks": 0,
+        "transiciones_open": 0
+      }
+    },
+    "lentitud_concurrente": {
+      "latencia_pasarela_s": 6,
+      "reservas_concurrentes": 50,
+      "tiempo_total_s": 11.714,
+      "latencias": {
+        "n": 50,
+        "p50": 9.306,
+        "p95": 11.266,
+        "max": 11.543,
+        "media": 9.547
+      },
+      "estados": {
+        "PENDIENTE_PAGO": 50
+      },
+      "metricas": {
+        "circuit_breaker": "CLOSED",
+        "fallos_consecutivos": 0,
+        "bulkhead_en_uso": 0,
+        "bulkhead_capacidad": 1000,
+        "umbral": 100000,
+        "llamadas_pasarela": 50,
+        "exitos": 50,
+        "fallos": 0,
+        "timeouts": 0,
+        "rechazos_circuito": 0,
+        "rechazos_bulkhead": 0,
+        "fallbacks": 0,
+        "transiciones_open": 0
+      },
+      "sondas": {
+        "disponibilidad_via_gateway": {
+          "n": 12,
+          "p50": 0.56,
+          "p95": 3.151,
+          "max": 6.146,
+          "media": 1.037
+        },
+        "resumen_bff_via_gateway": {
+          "n": 9,
+          "p50": 0.608,
+          "p95": 5.105,
+          "max": 8.02,
+          "media": 1.441
+        },
+        "pagos_interno": {
+          "n": 111,
+          "p50": 0.005,
+          "p95": 0.044,
+          "max": 3.631,
+          "media": 0.048
+        }
+      },
+      "pagos_tras_drenar": {
+        "COBRADO": 50
+      },
+      "saga_tras_drenar": {
+        "PENDIENTE_PAGO": 50
+      }
+    },
+    "caida": {
+      "reservas_secuenciales": 12,
+      "latencias": {
+        "n": 12,
+        "p50": 0.658,
+        "p95": 0.704,
+        "max": 0.706,
+        "media": 0.663
+      },
+      "estados": {
+        "COMPENSADA": 12
+      },
+      "llamadas_que_llegaron_a_la_pasarela": 12,
+      "metricas": {
+        "circuit_breaker": "CLOSED",
+        "fallos_consecutivos": 12,
+        "bulkhead_en_uso": 0,
+        "bulkhead_capacidad": 1000,
+        "umbral": 100000,
+        "llamadas_pasarela": 12,
+        "exitos": 0,
+        "fallos": 12,
+        "timeouts": 0,
+        "rechazos_circuito": 0,
+        "rechazos_bulkhead": 0,
+        "fallbacks": 0,
+        "transiciones_open": 0
+      },
+      "latencia_por_intento_s": [
+        0.661,
+        0.656,
+        0.652,
+        0.693,
+        0.654,
+        0.66,
+        0.629,
+        0.706,
+        0.663,
+        0.64,
+        0.636,
+        0.702
+      ]
+    },
+    "recuperacion": {
+      "intento": {
+        "i": 0,
+        "id_reserva": "recup-C-0-569b9397",
+        "t_inicio_s": 1795481542.0296402,
+        "duracion_s": 0.645,
+        "http": 201,
+        "estado": "CONFIRMADA"
+      },
+      "metricas": {
+        "circuit_breaker": "CLOSED",
+        "fallos_consecutivos": 0,
+        "bulkhead_en_uso": 0,
+        "bulkhead_capacidad": 1000,
+        "umbral": 100000,
+        "llamadas_pasarela": 13,
+        "exitos": 1,
+        "fallos": 12,
+        "timeouts": 0,
+        "rechazos_circuito": 0,
+        "rechazos_bulkhead": 0,
+        "fallbacks": 0,
+        "transiciones_open": 0
+      }
+    }
+  }
+}

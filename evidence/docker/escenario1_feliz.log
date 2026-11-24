@@ -1,0 +1,11 @@
+2026-11-24 00:31:21,237 INFO habitaciones.http evento=request servicio=habitaciones metodo=POST ruta=/reservas estado=201 ms=12 corr=esc1-92ba7c98
+2026-11-24 00:31:21,247 INFO saga evento=estado_saga reserva=feliz-5e5c6a3a estado=HABITACION_RESERVADA error=None corr=esc1-92ba7c98
+2026-11-24 00:31:21,343 INFO pasarela evento=cobro_realizado pago=pay-feliz-5e5c6a3a reserva=feliz-5e5c6a3a corr=esc1-92ba7c98
+2026-11-24 00:31:21,344 INFO pasarela.http evento=request servicio=pasarela metodo=POST ruta=/cobros estado=201 ms=12 corr=esc1-92ba7c98
+2026-11-24 00:31:21,357 INFO pagos.http evento=request servicio=pagos metodo=POST ruta=/pagos estado=201 ms=107 corr=esc1-92ba7c98
+2026-11-24 00:31:21,367 INFO saga evento=estado_saga reserva=feliz-5e5c6a3a estado=PAGO_COBRADO error=None corr=esc1-92ba7c98
+2026-11-24 00:31:21,371 INFO pagos.http evento=request servicio=pagos metodo=GET ruta=/pagos/pay-feliz-5e5c6a3a estado=200 ms=3 corr=esc1-92ba7c98
+2026-11-24 00:31:21,388 INFO confirmaciones.http evento=request servicio=confirmaciones metodo=POST ruta=/confirmaciones estado=201 ms=11 corr=esc1-92ba7c98
+2026-11-24 00:31:21,398 INFO saga evento=estado_saga reserva=feliz-5e5c6a3a estado=CONFIRMADA error=None corr=esc1-92ba7c98
+2026-11-24 00:31:21,400 INFO saga.http evento=request servicio=saga metodo=POST ruta=/reservas estado=201 ms=277 corr=esc1-92ba7c98
+2026-11-24 00:31:21,404 INFO gateway evento=proxy cliente=demo POST /api/reservas -> 201 corr=esc1-92ba7c98
