@@ -38,29 +38,33 @@ Evidencia: `evidence/docker/escenario1_feliz` y `escenario2_compensacion` (`.jso
 
 ## Escenario 3: pasarela lenta y caída
 
-Tres configuraciones de Pagos, cambiadas solo con variables de entorno:
+Cuatro configuraciones de Pagos, cambiadas solo con variables de entorno:
 
 | | Timeout | Circuit Breaker | Bulkhead |
 |---|---|---|---|
 | A: con patrones | 1 s | umbral 2 | 2 |
 | B: sin breaker ni bulkhead | 1 s | neutralizado | neutralizado |
-| C: sin ningún patrón | 30 s | neutralizado | neutralizado |
+| C: sin breaker, bulkhead ni timeout corto | 30 s | neutralizado | neutralizado |
+| D: solo bulkhead | 30 s | neutralizado | 2 |
 
 Fases: 50 reservas simultáneas con la pasarela a 6 s, luego 12 reservas seguidas con la pasarela caída y una recuperación. Se usaron 50 reservas porque Pagos atiende en un pool de 40 hilos.
 
-| Resultado | A | B | C |
-|---|---|---|---|
-| Pagos tras la lentitud | 47 `RECHAZADO`, 3 `INCIERTO` | 50 `INCIERTO` | 50 `COBRADO` |
-| Reservas sin resolver | 3 | 50 | 50 |
-| Llamadas que llegaron a la pasarela | 3 de 50 | 50 | 50 |
-| Latencia de Pagos, máximo | 120 ms | 78 ms | 3631 ms |
-| Con pasarela caída, llamadas que la golpearon | 3 de 12 | 12 | 12 |
+| Resultado | A | B | C | D |
+|---|---|---|---|---|
+| Pagos tras la lentitud | 47 `RECHAZADO`, 3 `INCIERTO` | 50 `INCIERTO` | 50 `COBRADO` | 48 `RECHAZADO`, 2 `COBRADO` |
+| Reservas sin resolver | 3 | 50 | 50 | 2 |
+| Llamadas que llegaron a la pasarela | 3 de 50 | 50 | 50 | 2 |
+| Rechazos del breaker y del bulkhead | 43 y 4 | 0 y 0 | 0 y 0 | 0 y 48 |
+| Latencia de Pagos, máximo | 127 ms | 139 ms | 3172 ms | 137 ms |
+| Con pasarela caída, llamadas que la golpearon | 3 de 12 | 12 | 12 | 12 |
 
 **Interpretación**
-- **A:** el breaker y el bulkhead rechazaron 47 llamadas al instante (44 y 3) y la saga las compensó limpiamente.
+- **A:** el breaker y el bulkhead rechazaron 47 llamadas al instante (43 y 4) y la saga las compensó limpiamente.
 - **B:** las 50 llamadas esperaron el timeout y todas las reservas quedaron por conciliar.
-- **C:** la pasarela terminó los 50 cobros después de que la saga se rindió a los 2,5 s. Resultado: 50 cobros sin reserva confirmada, y Pagos sin responder durante 3,6 s.
+- **C:** la pasarela terminó los 50 cobros después de que la saga se rindió a los 2,5 s. Resultado: 50 cobros sin reserva confirmada, y una consulta simple a Pagos que tardó 3,2 s (máximo observado).
+- **D:** con el timeout largo de C pero con bulkhead, solo 2 llamadas llegaron a la pasarela, 48 se rechazaron al instante y se compensaron, y Pagos no se detuvo. Comparada con C, aísla el efecto del bulkhead: limita los cobros sin reserva confirmada a 2 en lugar de 50.
 - **Caída:** con el breaker abierto se dejó de golpear a la pasarela caída (3 llamadas en vez de 12).
+- **Fail-fast:** en una medición directa sobre Pagos (`evidence/docker/escenario3_failfast.json`, pasarela a 6 s y timeout de 1 s), las dos primeras llamadas tardaron 1195 y 1052 ms; con el circuito abierto, las cuatro siguientes respondieron en 22 a 27 ms con el fallback `RECHAZADO` (no cobrado).
 
 Gráficos: `experimentos/grafico_estados_pagos.png`, `grafico_pasarela_caida.png` y `grafico_sonda_pagos.png`.
 
