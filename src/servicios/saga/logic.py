@@ -289,6 +289,11 @@ def avanzar(s):
         log.exception("evento=error_inesperado_saga reserva=%s", rid)
         cambiar(rid, "PENDIENTE_COMPENSACION" if s["estado"] in ("COMPENSANDO", "PENDIENTE_COMPENSACION") else "PENDIENTE_VERIFICACION", str(exc))
 
+def conteo_por_estado():
+    with db() as conn:
+        filas = conn.execute("SELECT estado, COUNT(*) AS n FROM sagas GROUP BY estado").fetchall()
+    return {f["estado"]: f["n"] for f in filas}
+
 ESTADOS_FINALES = ("CONFIRMADA", "COMPENSADA", "FALLIDA")
 
 def pendientes(antiguedad_s):

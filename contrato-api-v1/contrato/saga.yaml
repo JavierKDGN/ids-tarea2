@@ -142,6 +142,30 @@ paths:
         '502':
           $ref: '#/components/responses/SagaCompensada'
 
+  /metricas:
+    get:
+      tags: [Operacion]
+      operationId: saga_metricas
+      summary: Conteo de reservas por estado
+      description: Solo red interna; no se publica por el Gateway.
+      x-estado: implementado
+      responses:
+        '200':
+          description: Total de reservas y cantidad por estado de la Saga.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [total_reservas, reservas_por_estado]
+                properties:
+                  total_reservas: {type: integer}
+                  reservas_por_estado:
+                    type: object
+                    additionalProperties: {type: integer}
+              example:
+                total_reservas: 52
+                reservas_por_estado: {CONFIRMADA: 40, COMPENSADA: 9, PENDIENTE_PAGO: 3}
+
   /health:
     get:
       tags: [Operacion]

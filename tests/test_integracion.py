@@ -312,3 +312,15 @@ def test_pagos_reintenta_con_backoff_cuando_la_pasarela_no_cobro(server, tmp_pat
             proceso.kill()
         log.close()
         chaos(server)
+
+
+def test_metricas_incluyen_latencia_y_conteo_de_reservas(server):
+    chaos(server)
+    assert crear(server, "metricas-" + uuid.uuid4().hex[:8], habitacion=60).json()["estado"] == "CONFIRMADA"
+    pagos = httpx.get(server["pagos"] + "/metricas").json()
+    assert pagos["latencia_pasarela_ms"]["n"] >= 1
+    assert pagos["latencia_pasarela_ms"]["p95"] >= pagos["latencia_pasarela_ms"]["p50"] > 0
+    assert "reintentos" in pagos
+    saga = httpx.get(server["saga"] + "/metricas").json()
+    assert saga["total_reservas"] >= 1
+    assert saga["reservas_por_estado"].get("CONFIRMADA", 0) >= 1

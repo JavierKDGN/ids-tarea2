@@ -84,6 +84,7 @@ def cobro_no_realizado(respuesta):
 def call_pasarela_post(pago, corr):
     """Solo se protege el cobro, que es la dependencia fragil del ejercicio."""
     prueba = resiliencia.entrar()
+    inicio = time.perf_counter()
     exito = False
     timeout = False
     try:
@@ -112,6 +113,7 @@ def call_pasarela_post(pago, corr):
         timeout = True
         raise
     finally:
+        resiliencia.registrar_latencia((time.perf_counter() - inicio) * 1000)
         resiliencia.salir(prueba, ok=exito, timeout=timeout)
 
 @app.post("/pagos", status_code=201)

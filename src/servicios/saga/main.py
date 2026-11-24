@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from src.common.correlacion import instalar
 from src.common.errores import instalar_errores
-from .logic import ContratoInvalido, consultar, ejecutar, iniciar_reconciliador, registrar
+from .logic import ContratoInvalido, conteo_por_estado, consultar, ejecutar, iniciar_reconciliador, registrar
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 INTERVALO_RECONCILIACION_S = float(os.getenv("RECONCILIACION_SEGUNDOS", "0"))
@@ -79,6 +79,11 @@ def reconciliar(id_reserva: str):
         raise HTTPException(404, "Reserva no encontrada")
     ejecutar(id_reserva)
     return respuesta(consultar(id_reserva=id_reserva))
+
+@app.get("/metricas")
+def metricas():
+    conteo = conteo_por_estado()
+    return {"total_reservas": sum(conteo.values()), "reservas_por_estado": conteo}
 
 @app.get("/health")
 def health():

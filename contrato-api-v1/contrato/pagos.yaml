@@ -222,8 +222,8 @@ paths:
     get:
       tags: [Resiliencia]
       operationId: pagos_metricas
-      summary: Metricas de Circuit Breaker y Bulkhead
-      description: Contadores en memoria; evidencia para el escenario 3. Solo red interna.
+      summary: Metricas de Circuit Breaker, Bulkhead, reintentos y latencia de la pasarela
+      description: Contadores y latencias en memoria (ultimas 500 llamadas); evidencia para el escenario 3. Solo red interna.
       x-estado: implementado
       responses:
         '200':
@@ -339,6 +339,8 @@ components:
         - rechazos_bulkhead
         - fallbacks
         - transiciones_open
+        - reintentos
+        - latencia_pasarela_ms
       properties:
         circuit_breaker:
           type: string
@@ -355,3 +357,13 @@ components:
         rechazos_bulkhead: {type: integer, description: Rechazadas por Bulkhead lleno.}
         fallbacks: {type: integer}
         transiciones_open: {type: integer}
+        reintentos: {type: integer, description: Reintentos con backoff hechos tras un 503 NO_COBRADO o un error de conexion.}
+        latencia_pasarela_ms:
+          type: object
+          description: Duracion de las llamadas efectivas a la pasarela, en milisegundos.
+          properties:
+            n: {type: integer}
+            media: {type: number, nullable: true}
+            p50: {type: number, nullable: true}
+            p95: {type: number, nullable: true}
+            max: {type: number, nullable: true}

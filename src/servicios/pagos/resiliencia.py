@@ -6,6 +6,7 @@ import logging
 import os
 import threading
 import time
+from collections import deque
 
 log = logging.getLogger("pagos.resiliencia")
 
@@ -31,15 +32,33 @@ class Resiliencia:
             self.abierto_desde = 0.0
             self.probe_en_curso = False
             self.en_vuelo = 0
+            self.latencias = deque(maxlen=500)
             self.contadores = {
                 "llamadas_pasarela": 0, "exitos": 0, "fallos": 0,
                 "timeouts": 0, "rechazos_circuito": 0, "rechazos_bulkhead": 0,
                 "fallbacks": 0, "transiciones_open": 0, "reintentos": 0,
             }
 
+    def registrar_latencia(self, ms):
+        with self._lock:
+            self.latencias.append(ms)
+
+    def resumen_latencias(self):
+        datos = sorted(self.latencias)
+        if not datos:
+            return {"n": 0, "media": None, "p50": None, "p95": None, "max": None}
+        def percentil(p):
+            k = (len(datos) - 1) * p / 100
+            f = int(k)
+            c = min(f + 1, len(datos) - 1)
+            return round(datos[f] + (datos[c] - datos[f]) * (k - f), 1)
+        return {"n": len(datos), "media": round(sum(datos) / len(datos), 1),
+                "p50": percentil(50), "p95": percentil(95), "max": round(datos[-1], 1)}
+
     def snapshot(self):
         with self._lock:
             return {"circuit_breaker": self.estado,
+                    "latencia_pasarela_ms": self.resumen_latencias(),
                     "fallos_consecutivos": self.fallos_consecutivos,
                     "bulkhead_en_uso": self.en_vuelo,
                     "bulkhead_capacidad": self.capacidad,
