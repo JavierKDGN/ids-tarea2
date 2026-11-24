@@ -70,9 +70,42 @@ def dibujar(mensajes, titulo, archivo):
     plt.close(fig)
 
 
+def estados_breaker():
+    from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
+
+    fig, ax = plt.subplots(figsize=(8.4, 3.9))
+    ax.set_xlim(0, 10)
+    ax.set_ylim(0, 4.6)
+    ax.axis("off")
+
+    def caja(x, y, w, h, texto, fc, ec, tam=9, bold=False):
+        ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.05,rounding_size=0.15", fc=fc, ec=ec, lw=1.3))
+        ax.text(x + w / 2, y + h / 2, texto, ha="center", va="center", fontsize=tam, fontweight="bold" if bold else "normal")
+
+    def flecha(p0, p1, texto, tx, ty, color="#1f4e79", rad=0.0):
+        ax.add_patch(FancyArrowPatch(p0, p1, arrowstyle="-|>", mutation_scale=12, color=color, lw=1.3,
+                                     connectionstyle=f"arc3,rad={rad}"))
+        ax.text(tx, ty, texto, ha="center", va="center", fontsize=7.5, color=color)
+
+    caja(0.3, 2.2, 2.2, 0.9, "CLOSED\nllama a la pasarela", "#e6f4ea", "#2a9d8f", bold=True)
+    caja(7.5, 2.2, 2.2, 0.9, "OPEN\nfail-fast con fallback", "#fdecea", "#b3261e", bold=True)
+    caja(3.9, 0.3, 2.2, 0.9, "HALF_OPEN\nuna sola prueba", "#fff4e0", "#b45f06", bold=True)
+    caja(0.3, 3.8, 9.4, 0.6, "Antes de cada llamada, el Bulkhead limita las simultáneas: si está lleno, rechazo inmediato (RECHAZADO)", "#eef3f8", "#1f4e79", tam=7.5)
+
+    flecha((2.55, 2.65), (7.45, 2.65), "2 fallos seguidos (timeout o 503 NO_COBRADO)", 5.0, 2.85)
+    flecha((8.6, 2.15), (6.15, 0.85), "pasan 4 s", 8.4, 1.1, color="#b3261e", rad=-0.15)
+    flecha((3.85, 0.85), (1.4, 2.15), "la prueba tiene éxito", 1.5, 1.05, color="#2a9d8f", rad=-0.15)
+    flecha((5.0, 1.25), (8.2, 2.15), "la prueba falla", 6.5, 2.0, color="#b3261e", rad=0.15)
+
+    SALIDA.mkdir(parents=True, exist_ok=True)
+    fig.savefig(SALIDA / "estados_breaker.png", dpi=170, bbox_inches="tight")
+    plt.close(fig)
+
+
 def main():
     dibujar(FELIZ, "Flujo feliz: la reserva se confirma (201)", "flujo_feliz.png")
     dibujar(COMPENSACION, "Falla del último paso: compensación en orden inverso (502)", "flujo_compensacion.png")
+    estados_breaker()
     print("Diagramas en", SALIDA)
 
 
