@@ -6,6 +6,7 @@ un simple timeout: la pasarela podria cobrar DESPUES de que expiro la espera.
 import logging
 import os
 import sqlite3
+import time
 from contextlib import contextmanager
 from decimal import Decimal
 
@@ -25,6 +26,8 @@ instalar_errores(app)
 DB = os.getenv("PAGOS_DB", "pagos.db")
 PASARELA = os.getenv("PASARELA_URL", "http://127.0.0.1:8004")
 TIMEOUT = float(os.getenv("PASARELA_TIMEOUT", "1.0"))
+REINTENTOS = max(0, int(os.getenv("PASARELA_REINTENTOS", "0")))
+BACKOFF_S = float(os.getenv("PASARELA_BACKOFF_S", "0.2"))
 resiliencia = Resiliencia()
 
 @contextmanager
@@ -70,6 +73,14 @@ def estado(id_pago, nuevo):
         conn.execute("UPDATE pagos SET estado=? WHERE id_pago=?", (nuevo, id_pago))
     log.info("evento=estado_pago pago=%s estado=%s", id_pago, nuevo)
 
+def cobro_no_realizado(respuesta):
+    if respuesta.status_code != 503:
+        return False
+    try:
+        return respuesta.json().get("detail", {}).get("estado") == "NO_COBRADO"
+    except (ValueError, AttributeError):
+        return False
+
 def call_pasarela_post(pago, corr):
     """Solo se protege el cobro, que es la dependencia fragil del ejercicio."""
     prueba = resiliencia.entrar()
@@ -77,11 +88,23 @@ def call_pasarela_post(pago, corr):
     timeout = False
     try:
         with httpx.Client(timeout=TIMEOUT) as client:
-            respuesta = client.post(
-                f"{PASARELA}/cobros", json={
-                    "id_pago": pago.id_pago, "id_reserva": pago.id_reserva,
-                    "monto_centavos": to_centavos(pago.monto),
-                }, headers={"X-Correlation-ID": corr or pago.id_reserva})
+            for intento in range(REINTENTOS + 1):
+                try:
+                    respuesta = client.post(
+                        f"{PASARELA}/cobros", json={
+                            "id_pago": pago.id_pago, "id_reserva": pago.id_reserva,
+                            "monto_centavos": to_centavos(pago.monto),
+                        }, headers={"X-Correlation-ID": corr or pago.id_reserva})
+                    if not cobro_no_realizado(respuesta):
+                        break
+                except httpx.ConnectError:
+                    if intento == REINTENTOS:
+                        raise
+                if intento == REINTENTOS:
+                    break
+                resiliencia.sumar("reintentos")
+                log.warning("evento=reintento_pasarela pago=%s intento=%s", pago.id_pago, intento + 1)
+                time.sleep(BACKOFF_S * 2 ** intento)
         # Rechazo explicito NO_COBRADO permite compensacion segura.
         exito = respuesta.status_code in (200, 201)
         return respuesta

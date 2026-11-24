@@ -34,7 +34,7 @@ class Resiliencia:
             self.contadores = {
                 "llamadas_pasarela": 0, "exitos": 0, "fallos": 0,
                 "timeouts": 0, "rechazos_circuito": 0, "rechazos_bulkhead": 0,
-                "fallbacks": 0, "transiciones_open": 0,
+                "fallbacks": 0, "transiciones_open": 0, "reintentos": 0,
             }
 
     def snapshot(self):

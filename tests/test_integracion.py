@@ -7,6 +7,7 @@ import os
 import socket
 import subprocess
 import sys
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -247,6 +248,62 @@ def test_saga_reconcilia_sola_un_cobro_tardio(server, tmp_path):
         assert estado == "COMPENSADA", estado
         assert httpx.get(f"{server['pagos']}/pagos/pay-{rid}").json()["estado"] == "REEMBOLSADO"
         assert httpx.get(f"{server['habitaciones']}/reservas/{rid}").json()["estado"] == "LIBERADA"
+    finally:
+        proceso.terminate()
+        try:
+            proceso.wait(timeout=4)
+        except subprocess.TimeoutExpired:
+            proceso.kill()
+        log.close()
+        chaos(server)
+
+
+def test_pagos_reintenta_con_backoff_cuando_la_pasarela_no_cobro(server, tmp_path):
+    chaos(server)
+    puerto = puerto_libre()
+    env = os.environ.copy()
+    env.update({
+        "PYTHONPATH": str(ROOT), "PAGOS_DB": str(tmp_path / "pagos_reintento.db"),
+        "PASARELA_URL": server["pasarela"], "PASARELA_TIMEOUT": "0.5",
+        "PASARELA_REINTENTOS": "3", "PASARELA_BACKOFF_S": "1.0",
+        "CB_FAILURE_THRESHOLD": "50", "BULKHEAD_MAX_CONCURRENT": "10",
+    })
+    log = open(tmp_path / "pagos_reintento.log", "w")
+    proceso = subprocess.Popen(
+        [sys.executable, "-m", "uvicorn", "src.servicios.pagos.main:app", "--host", "127.0.0.1",
+         "--port", str(puerto), "--no-access-log"], cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT)
+    base = f"http://127.0.0.1:{puerto}"
+    try:
+        for _ in range(150):
+            try:
+                if httpx.get(base + "/health", timeout=0.3).status_code == 200:
+                    break
+            except httpx.RequestError:
+                pass
+            time.sleep(0.1)
+        else:
+            raise RuntimeError("No arranco pagos con reintentos")
+        calentamiento = "pay-calentamiento-" + uuid.uuid4().hex[:8]
+        assert httpx.post(base + "/pagos", json={"id_pago": calentamiento, "id_reserva": calentamiento,
+                                                  "monto": "10.00"}, timeout=8).status_code == 201
+        httpx.post(base + "/demo/reset-resiliencia")
+        httpx.post(server["pasarela"] + "/chaos", json={"latencia_segundos": 0, "forzar_error": True})
+        pago = "pay-reintento-" + uuid.uuid4().hex[:8]
+        resultado = {}
+        hilo = threading.Thread(target=lambda: resultado.update(r=httpx.post(
+            base + "/pagos", json={"id_pago": pago, "id_reserva": pago, "monto": "80.00"}, timeout=15)))
+        hilo.start()
+        for _ in range(100):
+            if httpx.get(base + "/metricas").json()["reintentos"] >= 1:
+                break
+            time.sleep(0.05)
+        httpx.post(server["pasarela"] + "/chaos", json={"latencia_segundos": 0, "forzar_error": False})
+        hilo.join()
+        r = resultado["r"]
+        assert r.status_code == 201 and r.json()["estado"] == "COBRADO", r.text
+        metricas = httpx.get(base + "/metricas").json()
+        assert metricas["reintentos"] >= 1
+        assert metricas["exitos"] == 1 and metricas["fallos"] == 0
     finally:
         proceso.terminate()
         try:
