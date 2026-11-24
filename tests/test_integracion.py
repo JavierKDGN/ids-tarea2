@@ -178,3 +178,29 @@ def test_timeout_de_pago_no_deja_cobro_huerfano(server):
     assert r2.json()["estado"] == "COMPENSADA", r2.text
     assert httpx.get(f"{server['pagos']}/pagos/pay-{rid}").json()["estado"] == "REEMBOLSADO"
     assert httpx.get(f"{server['habitaciones']}/reservas/{rid}").json()["estado"] == "LIBERADA"
+
+
+def test_errores_usan_el_formato_del_contrato(server):
+    chaos(server)
+    casos = [
+        (server["saga"] + "/reservas/no-existe", 404, "RECURSO_NO_ENCONTRADO"),
+        (server["habitaciones"] + "/reservas/no-existe", 404, "RECURSO_NO_ENCONTRADO"),
+        (server["pagos"] + "/pagos/no-existe", 404, "RECURSO_NO_ENCONTRADO"),
+        (server["confirmaciones"] + "/confirmaciones/no-existe", 404, "RECURSO_NO_ENCONTRADO"),
+    ]
+    for url, status, codigo in casos:
+        r = httpx.get(url)
+        assert r.status_code == status, url
+        assert set(r.json()) == {"error", "code", "message"}, r.text
+        assert r.json()["code"] == codigo
+    invalida = httpx.post(server["saga"] + "/reservas", json={})
+    assert invalida.status_code == 422
+    assert invalida.json()["code"] == "VALIDACION_FALLIDA"
+    assert crear(server, "err-a", habitacion=40).json()["estado"] == "CONFIRMADA"
+    conflicto = httpx.post(server["habitaciones"] + "/reservas", json={
+        "id_reserva": "err-b", "habitacion_id": 40, "fecha_inicio": "2027-05-01", "fecha_fin": "2027-05-03"})
+    assert conflicto.status_code == 409
+    assert conflicto.json()["code"] == "HABITACION_NO_DISPONIBLE"
+    reutilizada = crear(server, "err-a", habitacion=40, monto="999.00")
+    assert reutilizada.status_code == 409
+    assert reutilizada.json()["code"] == "IDEMPOTENCY_CONFLICT"

@@ -17,8 +17,8 @@ info:
       falle con 500 *antes* de persistir nada. Se activa en caliente, sin tocar el codigo.
       Solo accesible desde la red interna (`docker compose exec`); no se publica en el Gateway.
 
-    `x-estado`: `implementado` | `ajustar` | `nuevo`. Ajuste global pendiente: formato de error `Error`
-    (hoy `{"detail": ...}`). El registro de `X-Correlation-ID` en logs ya esta hecho.
+    `x-estado`: `implementado` | `ajustar` | `nuevo`. El formato de error `Error` y el registro de
+    `X-Correlation-ID` en logs ya estan implementados.
 servers:
   - url: http://confirmaciones:8003
     description: Red interna de Docker Compose

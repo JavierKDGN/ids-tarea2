@@ -14,9 +14,11 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from src.common.correlacion import instalar
+from src.common.errores import instalar_errores
 
 app = FastAPI(title="Servicio-Confirmacion")
 instalar(app, "confirmaciones")
+instalar_errores(app)
 DB_NAME = os.getenv("CONFIRMACIONES_DB", "confirmaciones.db")
 
 caos_config = {

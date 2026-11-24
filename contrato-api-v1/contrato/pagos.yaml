@@ -30,8 +30,8 @@ info:
 
     Idempotencia: la clave es `id_pago`. Misma clave con otro `id_reserva` o `monto` -> 409.
 
-    `x-estado`: `implementado` | `ajustar` | `nuevo`. Ajuste global pendiente: formato de error `Error`
-    (hoy `{"detail": ...}`). El `X-Correlation-ID` ya se registra en los logs de cada request.
+    `x-estado`: `implementado` | `ajustar` | `nuevo`. El formato de error `Error` y el registro de
+    `X-Correlation-ID` en los logs de cada request ya estan implementados.
 servers:
   - url: http://pagos:8002
     description: Red interna de Docker Compose

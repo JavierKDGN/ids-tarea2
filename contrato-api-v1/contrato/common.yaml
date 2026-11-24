@@ -73,8 +73,8 @@ components:
       description: |
         Formato de error comun a Gateway, BFF, Saga, Habitaciones, Confirmaciones y Pagos.
         La Pasarela externa simulada NO lo usa (es un tercero; ver `pasarela.yaml`).
-        AJUSTE REQUERIDO: hoy FastAPI responde `{"detail": ...}`; cada servicio debe
-        registrar un manejador global de `HTTPException` y `RequestValidationError`.
+        Implementado en `src/common/errores.py`, instalado como manejador global de `HTTPException` y
+        `RequestValidationError` en Saga, Habitaciones, Confirmaciones y Pagos.
       properties:
         error:
           type: string

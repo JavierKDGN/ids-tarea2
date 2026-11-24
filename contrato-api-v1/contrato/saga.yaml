@@ -43,7 +43,7 @@ info:
     ## Timeouts
     Toda llamada saliente usa `SERVICES_TIMEOUT` (def. 2.5 s).
 
-    `x-estado`: `implementado` | `ajustar` | `nuevo`. Ajuste global pendiente: formato de error `Error`.
+    `x-estado`: `implementado` | `ajustar` | `nuevo`. El formato de error `Error` ya esta implementado.
     El alias temporal `POST /api/reservar` ya se retiro.
 servers:
   - url: http://saga:8000

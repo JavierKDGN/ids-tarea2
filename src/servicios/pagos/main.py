@@ -14,12 +14,14 @@ from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from src.common.correlacion import instalar
+from src.common.errores import instalar_errores
 from .resiliencia import RechazoBulkhead, RechazoCircuito, Resiliencia
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 log = logging.getLogger("pagos")
 app = FastAPI(title="Servicio Pagos - resiliencia")
 instalar(app, "pagos")
+instalar_errores(app)
 DB = os.getenv("PAGOS_DB", "pagos.db")
 PASARELA = os.getenv("PASARELA_URL", "http://127.0.0.1:8004")
 TIMEOUT = float(os.getenv("PASARELA_TIMEOUT", "1.0"))
