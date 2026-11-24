@@ -13,7 +13,10 @@ from contextlib import contextmanager
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, model_validator
 
+from src.common.correlacion import instalar
+
 app = FastAPI(title="Servicio-Habitaciones")
+instalar(app, "habitaciones")
 DB_NAME = os.getenv("HABITACIONES_DB", "habitaciones.db")
 
 @contextmanager

@@ -14,6 +14,8 @@ from decimal import Decimal
 
 import httpx
 
+from src.common.correlacion import corr_actual
+
 log = logging.getLogger("saga")
 DB = os.getenv("SAGA_DB", "saga.db")
 ROOM = os.getenv("HABITACIONES_URL", "http://127.0.0.1:8001")
@@ -104,17 +106,17 @@ def cambiar(reserva, estado, error=None):
     with db() as conn:
         conn.execute("UPDATE sagas SET estado=?, error=?, actualizado=? WHERE id_reserva=?",
                      (estado, error, datetime.now(timezone.utc).isoformat(), reserva))
-    log.info("evento=estado_saga reserva=%s estado=%s error=%s", reserva, estado, error)
+    log.info("evento=estado_saga reserva=%s estado=%s error=%s corr=%s", reserva, estado, error, corr_actual.get())
 
 def obtener(client, url, corr):
-    r = client.get(url, headers={"X-Correlation-ID": corr})
+    r = client.get(url, headers={"X-Correlation-ID": corr_actual.get() or corr})
     if r.status_code == 404:
         return None
     r.raise_for_status()
     return r.json()
 
 def post(client, url, corr, datos=None):
-    return client.post(url, json=datos, headers={"X-Correlation-ID": corr})
+    return client.post(url, json=datos, headers={"X-Correlation-ID": corr_actual.get() or corr})
 
 def estado_remoto(client, url, corr):
     d = obtener(client, url, corr)

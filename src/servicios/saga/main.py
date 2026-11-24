@@ -8,10 +8,12 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, model_validator
 
+from src.common.correlacion import instalar
 from .logic import ContratoInvalido, consultar, ejecutar, registrar
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 app = FastAPI(title="Saga-orquestada")
+instalar(app, "saga")
 
 class Reserva(BaseModel):
     habitacion_id: int = Field(gt=0)

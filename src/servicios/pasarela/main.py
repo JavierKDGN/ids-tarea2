@@ -15,9 +15,12 @@ from contextlib import contextmanager
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
+from src.common.correlacion import instalar
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("pasarela")
 app = FastAPI(title="Pasarela-externa")
+instalar(app, "pasarela")
 DB = os.getenv("PASARELA_DB", "pasarela.db")
 lock = threading.Lock()
 chaos = {"latencia_segundos": 0.0, "forzar_error": False}
