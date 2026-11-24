@@ -1,0 +1,201 @@
+{
+  "configuracion": "D_solo_bulkhead",
+  "descripcion": "Solo Bulkhead de 2 con timeout de 30 s; Circuit Breaker neutralizado",
+  "env": {
+    "RATE_LIMIT_PER_MINUTE": "5000",
+    "RECONCILIACION_SEGUNDOS": "0",
+    "PASARELA_TIMEOUT": "30",
+    "CB_FAILURE_THRESHOLD": "100000",
+    "CB_RECOVERY_SECONDS": "4",
+    "BULKHEAD_MAX_CONCURRENT": "2"
+  },
+  "base": {
+    "latencias": {
+      "n": 5,
+      "p50": 0.648,
+      "p95": 0.845,
+      "max": 0.891,
+      "media": 0.697
+    },
+    "estados": {
+      "CONFIRMADA": 5
+    },
+    "metricas": {
+      "circuit_breaker": "CLOSED",
+      "latencia_pasarela_ms": {
+        "n": 5,
+        "media": 44.7,
+        "p50": 32.0,
+        "p95": 85.5,
+        "max": 98.0
+      },
+      "fallos_consecutivos": 0,
+      "bulkhead_en_uso": 0,
+      "bulkhead_capacidad": 2,
+      "umbral": 100000,
+      "llamadas_pasarela": 5,
+      "exitos": 5,
+      "fallos": 0,
+      "timeouts": 0,
+      "rechazos_circuito": 0,
+      "rechazos_bulkhead": 0,
+      "fallbacks": 0,
+      "transiciones_open": 0,
+      "reintentos": 0
+    }
+  },
+  "lentitud_concurrente": {
+    "latencia_pasarela_s": 6,
+    "reservas_concurrentes": 50,
+    "tiempo_total_s": 9.5,
+    "latencias": {
+      "n": 50,
+      "p50": 8.175,
+      "p95": 9.268,
+      "max": 9.459,
+      "media": 8.081
+    },
+    "estados": {
+      "PENDIENTE_PAGO": 2,
+      "COMPENSADA": 48
+    },
+    "metricas": {
+      "circuit_breaker": "CLOSED",
+      "latencia_pasarela_ms": {
+        "n": 2,
+        "media": 6074.1,
+        "p50": 6074.1,
+        "p95": 6104.2,
+        "max": 6107.6
+      },
+      "fallos_consecutivos": 0,
+      "bulkhead_en_uso": 0,
+      "bulkhead_capacidad": 2,
+      "umbral": 100000,
+      "llamadas_pasarela": 2,
+      "exitos": 2,
+      "fallos": 0,
+      "timeouts": 0,
+      "rechazos_circuito": 0,
+      "rechazos_bulkhead": 48,
+      "fallbacks": 48,
+      "transiciones_open": 0,
+      "reintentos": 0
+    },
+    "sondas": {
+      "disponibilidad_via_gateway": {
+        "n": 9,
+        "p50": 0.639,
+        "p95": 3.925,
+        "max": 6.089,
+        "media": 1.232
+      },
+      "resumen_bff_via_gateway": {
+        "n": 7,
+        "p50": 0.716,
+        "p95": 5.242,
+        "max": 7.152,
+        "media": 1.619
+      },
+      "pagos_interno": {
+        "n": 129,
+        "p50": 0.005,
+        "p95": 0.007,
+        "max": 0.137,
+        "media": 0.008
+      }
+    },
+    "pagos_tras_drenar": {
+      "COBRADO": 2,
+      "RECHAZADO": 48
+    },
+    "saga_tras_drenar": {
+      "PENDIENTE_PAGO": 2,
+      "COMPENSADA": 48
+    }
+  },
+  "caida": {
+    "reservas_secuenciales": 12,
+    "latencias": {
+      "n": 12,
+      "p50": 0.672,
+      "p95": 0.768,
+      "max": 0.78,
+      "media": 0.687
+    },
+    "estados": {
+      "COMPENSADA": 12
+    },
+    "llamadas_que_llegaron_a_la_pasarela": 12,
+    "metricas": {
+      "circuit_breaker": "CLOSED",
+      "latencia_pasarela_ms": {
+        "n": 12,
+        "media": 26.0,
+        "p50": 22.7,
+        "p95": 39.4,
+        "max": 51.7
+      },
+      "fallos_consecutivos": 12,
+      "bulkhead_en_uso": 0,
+      "bulkhead_capacidad": 2,
+      "umbral": 100000,
+      "llamadas_pasarela": 12,
+      "exitos": 0,
+      "fallos": 12,
+      "timeouts": 0,
+      "rechazos_circuito": 0,
+      "rechazos_bulkhead": 0,
+      "fallbacks": 0,
+      "transiciones_open": 0,
+      "reintentos": 0
+    },
+    "latencia_por_intento_s": [
+      0.661,
+      0.701,
+      0.645,
+      0.68,
+      0.695,
+      0.759,
+      0.78,
+      0.664,
+      0.724,
+      0.638,
+      0.648,
+      0.65
+    ]
+  },
+  "recuperacion": {
+    "intento": {
+      "i": 0,
+      "id_reserva": "recup-D-0-aebc9347",
+      "t_inicio_s": 1795560078.8809812,
+      "duracion_s": 0.712,
+      "http": 201,
+      "estado": "CONFIRMADA"
+    },
+    "metricas": {
+      "circuit_breaker": "CLOSED",
+      "latencia_pasarela_ms": {
+        "n": 13,
+        "media": 26.4,
+        "p50": 23.6,
+        "p95": 39.3,
+        "max": 51.7
+      },
+      "fallos_consecutivos": 0,
+      "bulkhead_en_uso": 0,
+      "bulkhead_capacidad": 2,
+      "umbral": 100000,
+      "llamadas_pasarela": 13,
+      "exitos": 1,
+      "fallos": 12,
+      "timeouts": 0,
+      "rechazos_circuito": 0,
+      "rechazos_bulkhead": 0,
+      "fallbacks": 0,
+      "transiciones_open": 0,
+      "reintentos": 0
+    }
+  }
+}

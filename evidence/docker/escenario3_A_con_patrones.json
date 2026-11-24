@@ -3,6 +3,7 @@
   "descripcion": "Timeout 1 s + Circuit Breaker (umbral 2) + Bulkhead (2)",
   "env": {
     "RATE_LIMIT_PER_MINUTE": "5000",
+    "RECONCILIACION_SEGUNDOS": "0",
     "PASARELA_TIMEOUT": "1.0",
     "CB_FAILURE_THRESHOLD": "2",
     "CB_RECOVERY_SECONDS": "4",
@@ -11,16 +12,23 @@
   "base": {
     "latencias": {
       "n": 5,
-      "p50": 0.655,
-      "p95": 0.791,
-      "max": 0.822,
-      "media": 0.685
+      "p50": 0.668,
+      "p95": 0.856,
+      "max": 0.898,
+      "media": 0.714
     },
     "estados": {
       "CONFIRMADA": 5
     },
     "metricas": {
       "circuit_breaker": "CLOSED",
+      "latencia_pasarela_ms": {
+        "n": 5,
+        "media": 47.4,
+        "p50": 30.2,
+        "p95": 90.1,
+        "max": 100.8
+      },
       "fallos_consecutivos": 0,
       "bulkhead_en_uso": 0,
       "bulkhead_capacidad": 2,
@@ -32,19 +40,20 @@
       "rechazos_circuito": 0,
       "rechazos_bulkhead": 0,
       "fallbacks": 0,
-      "transiciones_open": 0
+      "transiciones_open": 0,
+      "reintentos": 0
     }
   },
   "lentitud_concurrente": {
     "latencia_pasarela_s": 6,
     "reservas_concurrentes": 50,
-    "tiempo_total_s": 9.571,
+    "tiempo_total_s": 9.73,
     "latencias": {
       "n": 50,
-      "p50": 8.175,
-      "p95": 9.163,
-      "max": 9.555,
-      "media": 8.117
+      "p50": 8.04,
+      "p95": 9.424,
+      "max": 9.711,
+      "media": 7.926
     },
     "estados": {
       "COMPENSADA": 47,
@@ -52,6 +61,13 @@
     },
     "metricas": {
       "circuit_breaker": "OPEN",
+      "latencia_pasarela_ms": {
+        "n": 3,
+        "media": 1077.9,
+        "p50": 1055.9,
+        "p95": 1149.1,
+        "max": 1159.4
+      },
       "fallos_consecutivos": 3,
       "bulkhead_en_uso": 0,
       "bulkhead_capacidad": 2,
@@ -60,32 +76,33 @@
       "exitos": 0,
       "fallos": 3,
       "timeouts": 3,
-      "rechazos_circuito": 44,
-      "rechazos_bulkhead": 3,
+      "rechazos_circuito": 43,
+      "rechazos_bulkhead": 4,
       "fallbacks": 47,
-      "transiciones_open": 2
+      "transiciones_open": 2,
+      "reintentos": 0
     },
     "sondas": {
       "disponibilidad_via_gateway": {
         "n": 9,
-        "p50": 0.591,
-        "p95": 3.955,
-        "max": 6.141,
-        "media": 1.211
+        "p50": 0.671,
+        "p95": 3.953,
+        "max": 6.078,
+        "media": 1.269
       },
       "resumen_bff_via_gateway": {
         "n": 8,
-        "p50": 0.64,
-        "p95": 4.989,
-        "max": 7.272,
-        "media": 1.473
+        "p50": 0.74,
+        "p95": 4.499,
+        "max": 6.143,
+        "media": 1.488
       },
       "pagos_interno": {
-        "n": 129,
-        "p50": 0.006,
-        "p95": 0.011,
-        "max": 0.12,
-        "media": 0.008
+        "n": 128,
+        "p50": 0.005,
+        "p95": 0.014,
+        "max": 0.127,
+        "media": 0.009
       }
     },
     "pagos_tras_drenar": {
@@ -101,10 +118,10 @@
     "reservas_secuenciales": 12,
     "latencias": {
       "n": 12,
-      "p50": 0.647,
-      "p95": 0.729,
-      "max": 0.734,
-      "media": 0.657
+      "p50": 0.649,
+      "p95": 0.78,
+      "max": 0.781,
+      "media": 0.666
     },
     "estados": {
       "COMPENSADA": 12
@@ -112,6 +129,13 @@
     "llamadas_que_llegaron_a_la_pasarela": 3,
     "metricas": {
       "circuit_breaker": "OPEN",
+      "latencia_pasarela_ms": {
+        "n": 3,
+        "media": 22.5,
+        "p50": 23.4,
+        "p95": 24.2,
+        "max": 24.3
+      },
       "fallos_consecutivos": 3,
       "bulkhead_en_uso": 0,
       "bulkhead_capacidad": 2,
@@ -123,34 +147,42 @@
       "rechazos_circuito": 9,
       "rechazos_bulkhead": 0,
       "fallbacks": 9,
-      "transiciones_open": 2
+      "transiciones_open": 2,
+      "reintentos": 0
     },
     "latencia_por_intento_s": [
-      0.676,
-      0.682,
-      0.621,
-      0.676,
-      0.635,
-      0.619,
-      0.725,
-      0.734,
-      0.608,
-      0.66,
-      0.622,
-      0.624
+      0.662,
+      0.686,
+      0.62,
+      0.625,
+      0.616,
+      0.779,
+      0.677,
+      0.781,
+      0.631,
+      0.613,
+      0.671,
+      0.636
     ]
   },
   "recuperacion": {
     "intento": {
       "i": 0,
-      "id_reserva": "recup-A-0-8f39f65d",
-      "t_inicio_s": 1795481262.400519,
-      "duracion_s": 0.664,
+      "id_reserva": "recup-A-0-a38a7d67",
+      "t_inicio_s": 1795559654.279768,
+      "duracion_s": 0.693,
       "http": 201,
       "estado": "CONFIRMADA"
     },
     "metricas": {
       "circuit_breaker": "CLOSED",
+      "latencia_pasarela_ms": {
+        "n": 4,
+        "media": 24.3,
+        "p50": 23.9,
+        "p95": 29.0,
+        "max": 29.8
+      },
       "fallos_consecutivos": 0,
       "bulkhead_en_uso": 0,
       "bulkhead_capacidad": 2,
@@ -162,7 +194,8 @@
       "rechazos_circuito": 9,
       "rechazos_bulkhead": 0,
       "fallbacks": 9,
-      "transiciones_open": 2
+      "transiciones_open": 2,
+      "reintentos": 0
     }
   }
 }

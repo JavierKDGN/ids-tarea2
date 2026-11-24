@@ -26,6 +26,11 @@ CONFIGURACIONES = {
         "env": {"RATE_LIMIT_PER_MINUTE": "5000", "RECONCILIACION_SEGUNDOS": "0", "PASARELA_TIMEOUT": "30",
                 "CB_FAILURE_THRESHOLD": "100000", "CB_RECOVERY_SECONDS": "4", "BULKHEAD_MAX_CONCURRENT": "1000"},
     },
+    "D_solo_bulkhead": {
+        "descripcion": "Solo Bulkhead de 2 con timeout de 30 s; Circuit Breaker neutralizado",
+        "env": {"RATE_LIMIT_PER_MINUTE": "5000", "RECONCILIACION_SEGUNDOS": "0", "PASARELA_TIMEOUT": "30",
+                "CB_FAILURE_THRESHOLD": "100000", "CB_RECOVERY_SECONDS": "4", "BULKHEAD_MAX_CONCURRENT": "2"},
+    },
 }
 
 LATENCIA_PASARELA_S = 6

@@ -9,15 +9,20 @@ import matplotlib.pyplot as plt
 
 AQUI = Path(__file__).resolve().parent
 RESUMEN = AQUI.parent / "evidence" / "docker" / "escenario3_resumen.json"
-ETIQUETAS = {"A_con_patrones": "A: con patrones", "B_sin_breaker_ni_bulkhead": "B: sin breaker ni bulkhead",
-             "C_sin_ningun_patron": "C: sin breaker, bulkhead ni timeout corto"}
-COLORES = {"A_con_patrones": "#2a9d8f", "B_sin_breaker_ni_bulkhead": "#e9c46a", "C_sin_ningun_patron": "#e76f51"}
+ETIQUETAS = {
+    "A_con_patrones": "A: timeout 1 s,\nbreaker y bulkhead",
+    "B_sin_breaker_ni_bulkhead": "B: solo timeout 1 s",
+    "C_sin_ningun_patron": "C: sin breaker, bulkhead\nni timeout corto (30 s)",
+    "D_solo_bulkhead": "D: solo bulkhead 2\n(timeout 30 s)",
+}
+COLORES = {"A_con_patrones": "#2a9d8f", "B_sin_breaker_ni_bulkhead": "#e9c46a", "C_sin_ningun_patron": "#e76f51",
+           "D_solo_bulkhead": "#457b9d"}
 ESTADOS = ["RECHAZADO", "INCIERTO", "COBRADO"]
 COLOR_ESTADO = {"RECHAZADO": "#2a9d8f", "INCIERTO": "#e9c46a", "COBRADO": "#e76f51"}
 
 
 def grafico_estados(resumen):
-    fig, ax = plt.subplots(figsize=(8, 4.5))
+    fig, ax = plt.subplots(figsize=(10.5, 4.8))
     nombres = list(resumen)
     base = [0] * len(nombres)
     for estado in ESTADOS:
@@ -26,20 +31,20 @@ def grafico_estados(resumen):
         base = [b + v for b, v in zip(base, valores)]
     ax.set_ylabel("pagos de las 50 reservas simultaneas")
     ax.set_title("Estado de los pagos tras la lentitud de la pasarela (6 s)")
-    ax.legend(title="estado del pago")
+    ax.legend(title="estado del pago", loc="center left", bbox_to_anchor=(1.01, 0.5))
     fig.tight_layout()
     fig.savefig(AQUI / "grafico_estados_pagos.png", dpi=150)
     plt.close(fig)
 
 
 def grafico_pasarela_caida(resumen):
-    fig, ax = plt.subplots(figsize=(8, 4.5))
+    fig, ax = plt.subplots(figsize=(10.5, 4.8))
     nombres = list(resumen)
     valores = [resumen[n]["caida"]["llamadas_que_llegaron_a_la_pasarela"] for n in nombres]
     barras = ax.bar([ETIQUETAS[n] for n in nombres], valores, color=[COLORES[n] for n in nombres])
     ax.bar_label(barras)
     ax.set_ylabel("llamadas que llegaron a la pasarela caida")
-    ax.set_title("12 reservas con la pasarela caida: cuantas llegaron a golpearla")
+    ax.set_title("12 reservas con la pasarela caida: cuantas llegaron a golpearla", fontsize=11)
     ax.set_ylim(0, 14)
     fig.tight_layout()
     fig.savefig(AQUI / "grafico_pasarela_caida.png", dpi=150)
@@ -52,7 +57,7 @@ def grafico_sonda_pagos():
         for fila in csv.DictReader(f):
             if fila["sonda"] == "pagos_interno":
                 series.setdefault(fila["configuracion"], []).append((float(fila["t_s"]), float(fila["ms"])))
-    fig, ax = plt.subplots(figsize=(8, 4.5))
+    fig, ax = plt.subplots(figsize=(10.5, 4.8))
     for nombre, puntos in series.items():
         ax.plot([p[0] for p in puntos], [p[1] for p in puntos], label=ETIQUETAS[nombre], color=COLORES[nombre], linewidth=1.4)
     ax.set_yscale("log")
