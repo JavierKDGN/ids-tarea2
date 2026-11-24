@@ -1,133 +1,98 @@
-"""
-    Operacion SAGA
-    1. Llamar a habitaciones
-    2. Llamar a Pagos (Timeout + Bulkhead + Circuit Breaker)
-    3. Confirmacion
-
-    BFF todo en una request
-"""
-
+import asyncio
+import logging
 import os
 import uuid
-import logging
+from datetime import datetime, timezone
+
 import httpx
-from datetime import date
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
-from .saga import ejecutar_compensacion
+from fastapi import FastAPI, Header
+from fastapi.responses import JSONResponse
 
-# Config logs
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("BFF-Orquestador")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+log = logging.getLogger("bff")
+app = FastAPI(title="BFF-web")
 
-app = FastAPI(title="Servicio-BFF")
+SAGA_URL = os.getenv("SAGA_URL", "http://127.0.0.1:8000")
+HABITACIONES_URL = os.getenv("HABITACIONES_URL", "http://127.0.0.1:8001")
+CONFIRMACION_URL = os.getenv("CONFIRMACION_URL", "http://127.0.0.1:8003")
+TIMEOUT = float(os.getenv("BFF_TIMEOUT", "2.0"))
 
-# URLs entorno
-HABITACIONES_URL = os.getenv("HABITACIONES_URL", "http://localhost:8001")
-PAGOS_URL = os.getenv("PAGOS_URL", "http://localhost:8002")
-CONFIRMACION_URL = os.getenv("CONFIRMACION_URL", "http://localhost:8003")
+ESTADOS_SAGA = (200, 202, 409, 502)
 
-class SolicitarReservaRequest(BaseModel):
-    habitacion_id: int
-    fecha_inicio: date
-    fecha_fin: date
-    monto: float = Field(gt=0)
-    id_reserva: str | None = None
+MENSAJES = {
+    "CONFIRMADA": "Reserva confirmada",
+    "COMPENSADA": "La reserva no pudo completarse y fue revertida",
+    "FALLIDA": "La reserva no pudo realizarse",
+}
+MENSAJE_EN_CURSO = "La reserva esta en proceso, consulte nuevamente en unos instantes"
 
-@app.post("/api/reservar", status_code=201)
-def reservar(req: SolicitarReservaRequest):
-    # TODO: FUNCION EJECUTAR COMPENSACION 
-    # ID unico de reserva para todo SAGA, si no existe se crea
-    id_transaccion = req.id_reserva or f"res-{uuid.uuid4().hex[:8]}"
-    id_pago = f"pay-{id_transaccion}"
-    id_voucher = f"voucher-{id_transaccion}"
 
-    flag_habitacion_reservada = False
-    flag_pago_realizado = False
-
-    with httpx.Client(timeout=5.0) as client:
-
-        # --------------------------------------
-        # 1: Reservar Habitacion
-        # --------------------------------------
+async def consultar(client, url, corr, estados_ok=(200,)):
+    try:
+        r = await client.get(url, headers={"X-Correlation-ID": corr})
+    except httpx.HTTPError:
+        return "NO_DISPONIBLE", None
+    if r.status_code in estados_ok:
         try:
-            response_hab = client.post(
-                f"{HABITACIONES_URL}/reservas",
-                json = {
-                    "id_reserva": id_transaccion,
-                    "habitacion_id": req.habitacion_id,
-                    "fecha_inicio": req.fecha_inicio,
-                    "fecha_fin": req.fecha_fin
-                }
-            )
-
-            if response_hab.status_code not in (200, 201):
-                raise HTTPException(status_code=response_hab.status_code, detail=f"Fallo en habitaciones: {response_hab.text}")
-
-            flag_habitacion_reservada = True
-        
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"No se pudo reservar la habitacion")
-
-        # --------------------------------------
-        # 2: Cobrar pago
-        # --------------------------------------
-        try:
-            response_pago = client.post(
-                f"{PAGOS_URL}/pagos",
-                json = {
-                    "id_reserva": id_transaccion,
-                    "id_pago": id_pago,
-                    "monto": req.monto
-                }
-            )
-
-            if response_pago.status_code not in (200, 201):
-                ejecutar_compensacion()
-                raise HTTPException(status_code=response_pago.status_code, detail=f"Fallo en pago")
-
-            flag_pago_realizado= True
-
-        except HTTPException:
-            raise
-        except Exception as e:
-            # Error distinto al anterior
-            ejecutar_compensacion()
-            raise HTTPException(status_code=500, detail=f"Error en servicio de pagos")
-
-        # --------------------------------------
-        # 3: Emitir confirmacion
-        # --------------------------------------
-        try:
-            response_conf = client.post(
-                f"{CONFIRMACION_URL}/confirmaciones",
-                json = {
-                    "id_reserva": id_transaccion,
-                    "id_voucher": id_voucher
-                }
-            )
-
-            if response_conf.status_code not in (200, 201):
-                ejecutar_compensacion()
-                raise HTTPException(status_code=response_conf.status_code, detail=f"Fallo en confirmacion")
-
-            flag_pago_realizado= True
-
-        except HTTPException:
-            raise
-        except Exception as e:
-            # Error distinto al anterior
-            ejecutar_compensacion()
-            raise HTTPException(status_code=response_conf.status_code, detail=f"Fallo en confirmacion. Se revirtieron los cargos.")
-
-        response = {
-            "mensaje": "Reserva completada exitosamente",
-            "id_reserva": id_transaccion,
-            "id_pago": id_pago,
-            "id_voucher": id_voucher,
-            "estado": "CONFIRMADA"
-        }
-
-        return response 
+            return "OK", r.json()
+        except ValueError:
+            return "NO_DISPONIBLE", None
+    if r.status_code == 404:
+        return "NO_EXISTE", None
+    return "NO_DISPONIBLE", None
 
 
+def vista_habitacion(h):
+    if not h:
+        return None
+    return {"habitacion_id": h["habitacion_id"], "fecha_inicio": h["fecha_inicio"],
+            "fecha_fin": h["fecha_fin"], "estado": h["estado"]}
+
+
+def vista_confirmacion(c):
+    if not c:
+        return None
+    return {"id_voucher": c["id_voucher"], "estado": c["estado"],
+            "fecha_emision": c.get("fecha_emision")}
+
+
+@app.get("/api/reservas/{id_reserva}/resumen")
+async def resumen(id_reserva: str, x_correlation_id: str | None = Header(default=None)):
+    corr = x_correlation_id or uuid.uuid4().hex
+    headers = {"X-Correlation-ID": corr}
+    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+        (f_saga, saga), (f_hab, hab), (f_conf, conf) = await asyncio.gather(
+            consultar(client, f"{SAGA_URL}/reservas/{id_reserva}", corr, ESTADOS_SAGA),
+            consultar(client, f"{HABITACIONES_URL}/reservas/{id_reserva}", corr),
+            consultar(client, f"{CONFIRMACION_URL}/confirmaciones/reserva/{id_reserva}", corr),
+        )
+
+    if f_saga == "NO_EXISTE":
+        log.info("evento=resumen_no_encontrado reserva=%s corr=%s", id_reserva, corr)
+        return JSONResponse(status_code=404, headers=headers, content={
+            "error": "no_encontrado", "code": "RECURSO_NO_ENCONTRADO", "message": "Reserva no encontrada"})
+    if f_saga != "OK":
+        log.warning("evento=resumen_saga_no_disponible reserva=%s corr=%s", id_reserva, corr)
+        return JSONResponse(status_code=503, headers=headers, content={
+            "error": "no_disponible", "code": "SAGA_NO_DISPONIBLE",
+            "message": "No se pudo consultar el estado de la reserva"})
+
+    fuentes = {"saga": f_saga, "habitacion": f_hab, "confirmacion": f_conf}
+    degradado = "NO_DISPONIBLE" in fuentes.values()
+    log.info("evento=resumen reserva=%s estado=%s degradado=%s corr=%s",
+             id_reserva, saga["estado"], degradado, corr)
+    return JSONResponse(headers=headers, content={
+        "id_reserva": id_reserva,
+        "mensaje": MENSAJES.get(saga["estado"], MENSAJE_EN_CURSO),
+        "degradado": degradado,
+        "saga": {"estado": saga["estado"], "error": saga.get("error"), "actualizado": saga["actualizado"]},
+        "habitacion": vista_habitacion(hab),
+        "confirmacion": vista_confirmacion(conf),
+        "fuentes": fuentes,
+        "generado": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}

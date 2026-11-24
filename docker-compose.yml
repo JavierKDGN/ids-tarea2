@@ -79,6 +79,20 @@ services:
       confirmaciones: {condition: service_healthy}
     healthcheck: *hc
 
+  bff:
+    <<: *servicio
+    container_name: bff
+    environment:
+      SERVICIO: bff
+      PORT: "8005"
+      SAGA_URL: http://saga:8000
+      HABITACIONES_URL: http://habitaciones:8001
+      CONFIRMACION_URL: http://confirmaciones:8003
+      BFF_TIMEOUT: ${BFF_TIMEOUT:-2.0}
+    depends_on:
+      saga: {condition: service_healthy}
+    healthcheck: *hc
+
   gateway:
     <<: *servicio
     container_name: gateway
@@ -93,6 +107,7 @@ services:
     depends_on:
       saga: {condition: service_healthy}
       habitaciones: {condition: service_healthy}
+      bff: {condition: service_healthy}
     healthcheck: *hc
     ports:
       - "${GW_HOST_PORT:-8080}:8080"
